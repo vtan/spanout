@@ -11,12 +11,30 @@ import qualified Graphics.Gloss.Interface.IO.Animate as Gloss
 
 type W a b = Wire (Timed Float ()) () Identity a b
 
+type Ball = (Float, Float)
+
 mainWire :: W () Gloss.Picture
 mainWire = proc () -> do
-  currentTime <- time -< ()
-  let pic = Gloss.text . show $ currentTime
-  returnA -< pic
---mainWire = time >>^ text . show
+  (pos, _vel) <- ballWire -< ()
+  returnA -< Gloss.translate pos 0 $ Gloss.circle 10
+
+ballWire :: W () Ball
+ballWire = proc () -> do
+  rec
+    ball' <- delay ballInit -< ball
+    ball <- bounceBall <<< moveBall -< ball'
+  returnA -< ball
+  where
+    ballInit = (0, 1)
+
+moveBall :: W Ball Ball
+moveBall = arr $ \(pos, vel) -> (pos + vel, vel)
+
+bounceBall :: W Ball Ball
+bounceBall = arr $ \(pos, vel) ->
+  if pos <= -480 && vel < 0 || pos >= 480 && vel > 0
+  then (pos, -vel)
+  else (pos, vel)
 
 main :: IO ()
 main = do
