@@ -22,19 +22,21 @@ ballWire :: W () Ball
 ballWire = proc () -> do
   rec
     ball' <- delay ballInit -< ball
-    ball <- bounceBall <<< moveBall -< ball'
+    ball <- moveAndMaybeBounce -< ball'
   returnA -< ball
   where
     ballInit = (0, 1)
+    moveAndMaybeBounce = (bounceBall <<< moveBall) <|> moveBall
 
 moveBall :: W Ball Ball
 moveBall = arr $ \(pos, vel) -> (pos + vel, vel)
 
 bounceBall :: W Ball Ball
-bounceBall = arr $ \(pos, vel) ->
-  if pos <= -480 && vel < 0 || pos >= 480 && vel > 0
-  then (pos, -vel)
-  else (pos, vel)
+bounceBall = negateVel <<< when bounceNeeded
+  where
+    negateVel = arr $ \(pos, vel) -> (pos, -vel)
+    bounceNeeded (pos, vel) =
+      (pos <= -480 && vel < 0) || (pos >= 480 && vel > 0)
 
 main :: IO ()
 main = do
