@@ -3,7 +3,6 @@
 module Main where
 
 import Prelude hiding (id, (.))
-import Control.Monad.Zip (mzipWith)
 import Control.Wire
 import Data.IORef
 import Data.Maybe (fromJust, isJust)
@@ -52,12 +51,10 @@ bounceNormal (V2 px py, _vel)
 
 reflectIfNeeded :: V2 Float -> V2 Float -> Maybe (V2 Float)
 reflectIfNeeded vel normal
-  | vel `dot` normal < 0 = Just $ mzipWith negateVelIfNormalNonzero vel normal
-  | otherwise            = Nothing
+  | dotprod < 0 = Just $ vel - (2 * dotprod) *^ normal
+  | otherwise   = Nothing
   where
-    negateVelIfNormalNonzero vi ni
-      | ni /= 0   = -vi
-      | otherwise =  vi
+    dotprod = vel `dot` normal
 
 
 arrJust :: (Monoid e, Monad m) => (a -> Maybe b) -> Wire s e m a b
