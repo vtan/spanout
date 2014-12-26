@@ -5,7 +5,7 @@ module Main where
 import Prelude hiding (id, (.))
 import Control.Wire
 import Data.IORef
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromMaybe)
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.IO.Animate as Gloss
 import Linear
@@ -25,24 +25,21 @@ mainWire = proc () -> do
 ballWire :: W () Ball
 ballWire = proc () -> do
   rec
-    ball' <- delay ballInit -< ball
-    ball <- moveAndMaybeBounce -< ball'
-  returnA -< ball
+    (pos, vel) <- delay ballInit -< ball'
+    let movedBall = (pos + vel, vel)
+        ball'     = fromMaybe movedBall $ bounceBall movedBall
+  returnA -< ball'
   where
     ballInit = (0, V2 3 2)
-    moveAndMaybeBounce = (bounceBall <<< moveBall) <|> moveBall
 
-moveBall :: W Ball Ball
-moveBall = arr $ \(pos, vel) -> (pos + vel, vel)
+bounceBall :: Ball -> Maybe Ball
+bounceBall (pos, vel) = do
+  normal <- ballBounceNormal pos
+  vel' <- reflectIfNeeded vel normal
+  return (pos, vel')
 
-bounceBall :: W Ball Ball
-bounceBall = proc ball@(pos, vel) -> do
-  normal <- arrJust bounceNormal -< ball
-  reflectedVel <- arrJust $ uncurry reflectIfNeeded -< (vel, normal)
-  returnA -< (pos, reflectedVel)
-
-bounceNormal :: Ball -> Maybe (V2 Float)
-bounceNormal (V2 px py, _vel)
+ballBounceNormal :: V2 Float -> Maybe (V2 Float)
+ballBounceNormal (V2 px py)
   | px <= -480 = Just $ V2   1   0
   | px >=  480 = Just $ V2 (-1)  0
   | py <= -270 = Just $ V2   0   1
@@ -56,9 +53,6 @@ reflectIfNeeded vel normal
   where
     dotprod = vel `dot` normal
 
-
-arrJust :: (Monoid e, Monad m) => (a -> Maybe b) -> Wire s e m a b
-arrJust f = arr fromJust <<< when isJust <<< arr f
 
 main :: IO ()
 main = do
