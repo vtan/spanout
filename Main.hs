@@ -4,10 +4,9 @@ module Main where
 
 import Prelude hiding (id, (.))
 import Control.Wire
-import Data.IORef
 import Data.Maybe (fromMaybe)
 import qualified Graphics.Gloss as Gloss
-import qualified Graphics.Gloss.Interface.IO.Animate as Gloss
+import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
 import Linear
 
 
@@ -54,24 +53,25 @@ reflectIfNeeded vel normal
     dotprod = vel `dot` normal
 
 
+type World = (W () Gloss.Picture, Gloss.Picture)
+
 main :: IO ()
-main = do
-  refWire <- newIORef mainWire
-  refTime <- newIORef 0
+main = Gloss.play disp bg fps world obtainPicture registerEvent performIteration
+  where
+    disp  = Gloss.InWindow "breakout" (960, 540) (100, 100)
+    bg    = Gloss.white
+    fps   = 60
+    world = (mainWire, Gloss.blank)
 
-  let disp = Gloss.InWindow "breakout" (960, 540) (100, 100)
-      bg   = Gloss.white
-  Gloss.animateIO disp bg $ \currentTime -> do
-    wire     <- readIORef refWire
-    lastTime <- readIORef refTime
+registerEvent :: Gloss.Event -> World -> World
+registerEvent _event world = world
 
-    let dTime           = currentTime - lastTime
-        timed           = Timed dTime ()
-        input           = Right ()
-        (result, wire') = runIdentity $ stepWire wire timed input
+performIteration :: Float -> World -> World
+performIteration dTime (wire, _lastPic) = (wire', pic)
+  where
+    timed              = Timed dTime ()
+    input              = Right ()
+    (Right pic, wire') = runIdentity $ stepWire wire timed input
 
-    writeIORef refWire wire'
-    writeIORef refTime currentTime
-    return $ case result of
-      Left  _   -> Gloss.blank
-      Right pic -> pic
+obtainPicture :: World -> Gloss.Picture
+obtainPicture (_wire, pic) = pic
