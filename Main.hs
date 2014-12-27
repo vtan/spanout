@@ -4,6 +4,7 @@ module Main where
 
 import Prelude hiding (id, (.))
 import Control.Wire
+import qualified Data.Bifunctor as Bifunctor
 import Data.Maybe (isJust, fromJust)
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
@@ -16,7 +17,7 @@ type Ball = (V2 Float, V2 Float)
 
 mainWire :: W Float Gloss.Picture
 mainWire = proc mouseX -> do
-  (V2 px py, V2 vx vy) <- ballWire -< ()
+  (V2 px py, V2 vx vy) <- ballWire -< mouseX
   let circ    = Gloss.circle ballRadius
       velLine = Gloss.line [(0, 0), (vx, vy)]
       ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
@@ -24,17 +25,20 @@ mainWire = proc mouseX -> do
               $ Gloss.rectangleWire batWidth batHeight
   returnA -< Gloss.pictures [ballPic, batPic]
 
-ballWire :: W () Ball
-ballWire = proc () -> do
-  rec ball <- updateBall <<< delay ballInit -< ball
+ballWire :: W Float Ball
+ballWire = proc batX -> do
+  rec
+    ball' <- delay ballInit -<  ball
+    ball  <- updateBall     -< (ball', batX)
   returnA -< ball
 
-updateBall :: W Ball Ball
+updateBall :: W (Ball, Float) Ball
 updateBall =
-  moveBall
-  ^>> (arr bounceBall >>> when isJust >>^ fromJust)
-  <|> when ballAlive
-  <|> arr (const ballInit)
+  Bifunctor.first moveBall
+  ^>> (fst ^>> arr bounceBall >>> when isJust >>^ fromJust)
+  <|> (arr (uncurry collideBallBat) >>> when isJust >>^ fromJust)
+  <|> (fst ^>> when ballAlive)
+  <|> (fst ^>> arr (const ballInit))
   where
     moveBall (pos, vel) = (pos + vel, vel)
     ballAlive (V2 _px py, _vel) = py > screenLowerBound
@@ -45,12 +49,27 @@ bounceBall (pos, vel) = do
   vel' <- reflectIfNeeded vel normal
   return (pos, vel')
 
+collideBallBat :: Ball -> Float -> Maybe Ball
+collideBallBat (pos, vel) batX = do
+  normal <- ballBatCollisionNormal batX pos
+  vel' <- reflectIfNeeded vel normal
+  return (pos, vel')
+
 ballBounceNormal :: V2 Float -> Maybe (V2 Float)
 ballBounceNormal (V2 px py)
   | px <= screenLeftBound  = Just $   unit _x
   | px >= screenRightBound = Just $ (-unit _x)
   | py >= screenUpperBound = Just $ (-unit _y)
   | otherwise              = Nothing
+
+ballBatCollisionNormal :: Float -> V2 Float -> Maybe (V2 Float)
+ballBatCollisionNormal batX (V2 px py)
+  | bxl && bxr && by = Just $ unit _y
+  | otherwise        = Nothing
+  where
+    bxl = px >= batX - batWidth / 2
+    bxr = px <= batX + batWidth / 2
+    by  = py <= batPositionY + batHeight / 2 + ballRadius
 
 reflectIfNeeded :: V2 Float -> V2 Float -> Maybe (V2 Float)
 reflectIfNeeded vel normal
