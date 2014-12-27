@@ -4,7 +4,7 @@ module Main where
 
 import Prelude hiding (id, (.))
 import Control.Wire
-import Data.Maybe (fromMaybe)
+import Data.Maybe (isJust, fromJust)
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
 import Linear
@@ -21,18 +21,23 @@ mainWire = proc mouseX -> do
       velLine = Gloss.line [(0, 0), (vx, vy)]
       ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
       batPic  = Gloss.translate mouseX batPositionY
-                $ Gloss.rectangleWire batWidth batHeight
+              $ Gloss.rectangleWire batWidth batHeight
   returnA -< Gloss.pictures [ballPic, batPic]
 
 ballWire :: W () Ball
 ballWire = proc () -> do
-  rec
-    (pos, vel) <- delay ballInit -< ball'
-    let movedBall = (pos + vel, vel)
-        ball'     = fromMaybe movedBall $ bounceBall movedBall
-  returnA -< ball'
+  rec ball <- updateBall <<< delay ballInit -< ball
+  returnA -< ball
+
+updateBall :: W Ball Ball
+updateBall =
+  moveBall
+  ^>> (arr bounceBall >>> when isJust >>^ fromJust)
+  <|> when ballAlive
+  <|> arr (const ballInit)
   where
-    ballInit = (0, V2 ballInitialVelocityX ballInitialVelocityY)
+    moveBall (pos, vel) = (pos + vel, vel)
+    ballAlive (V2 _px py, _vel) = py > screenLowerBound
 
 bounceBall :: Ball -> Maybe Ball
 bounceBall (pos, vel) = do
@@ -44,7 +49,6 @@ ballBounceNormal :: V2 Float -> Maybe (V2 Float)
 ballBounceNormal (V2 px py)
   | px <= screenLeftBound  = Just $   unit _x
   | px >= screenRightBound = Just $ (-unit _x)
-  | py <= screenLowerBound = Just $   unit _y
   | py >= screenUpperBound = Just $ (-unit _y)
   | otherwise              = Nothing
 
@@ -102,11 +106,8 @@ screenLowerBound = (-screenUpperBound)
 ballRadius :: Float
 ballRadius = 10
 
-ballInitialVelocityX :: Float
-ballInitialVelocityX = 3
-
-ballInitialVelocityY :: Float
-ballInitialVelocityY = 2
+ballInit :: Ball
+ballInit = (0, V2 3 2)
 
 batWidth :: Float
 batWidth = 160
