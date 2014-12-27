@@ -17,10 +17,11 @@ type Ball = (V2 Float, V2 Float)
 mainWire :: W Float Gloss.Picture
 mainWire = proc mouseX -> do
   (V2 px py, V2 vx vy) <- ballWire -< ()
-  let circ    = Gloss.circle 10
+  let circ    = Gloss.circle ballRadius
       velLine = Gloss.line [(0, 0), (vx, vy)]
       ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
-      batPic  = Gloss.translate mouseX (-260) $ Gloss.rectangleWire 100 10
+      batPic  = Gloss.translate mouseX batPositionY
+                $ Gloss.rectangleWire batWidth batHeight
   returnA -< Gloss.pictures [ballPic, batPic]
 
 ballWire :: W () Ball
@@ -31,7 +32,7 @@ ballWire = proc () -> do
         ball'     = fromMaybe movedBall $ bounceBall movedBall
   returnA -< ball'
   where
-    ballInit = (0, V2 3 2)
+    ballInit = (0, V2 ballInitialVelocityX ballInitialVelocityY)
 
 bounceBall :: Ball -> Maybe Ball
 bounceBall (pos, vel) = do
@@ -41,11 +42,11 @@ bounceBall (pos, vel) = do
 
 ballBounceNormal :: V2 Float -> Maybe (V2 Float)
 ballBounceNormal (V2 px py)
-  | px <= -480 = Just $ V2   1   0
-  | px >=  480 = Just $ V2 (-1)  0
-  | py <= -270 = Just $ V2   0   1
-  | py >=  270 = Just $ V2   0 (-1)
-  | otherwise  = Nothing
+  | px <= screenLeftBound  = Just $   unit _x
+  | px >= screenRightBound = Just $ (-unit _x)
+  | py <= screenLowerBound = Just $   unit _y
+  | py >= screenUpperBound = Just $ (-unit _y)
+  | otherwise              = Nothing
 
 reflectIfNeeded :: V2 Float -> V2 Float -> Maybe (V2 Float)
 reflectIfNeeded vel normal
@@ -60,7 +61,7 @@ type World = (W Float Gloss.Picture, Float, Gloss.Picture)
 main :: IO ()
 main = Gloss.play disp bg fps world obtainPicture registerEvent performIteration
   where
-    disp  = Gloss.InWindow "breakout" (960, 540) (100, 100)
+    disp  = Gloss.InWindow "breakout" (screenWidth, screenHeight) (100, 100)
     bg    = Gloss.white
     fps   = 60
     world = (mainWire, 0, Gloss.blank)
@@ -78,3 +79,40 @@ performIteration dTime (wire, mouseX, _lastPic) = (wire', mouseX, pic)
 
 obtainPicture :: World -> Gloss.Picture
 obtainPicture (_wire, _mouseX, pic) = pic
+
+
+screenWidth :: Int
+screenWidth = 960
+
+screenHeight :: Int
+screenHeight = 540
+
+screenRightBound :: Float
+screenRightBound = fromIntegral screenWidth / 2
+
+screenLeftBound :: Float
+screenLeftBound = (-screenRightBound)
+
+screenUpperBound :: Float
+screenUpperBound = fromIntegral screenHeight / 2
+
+screenLowerBound :: Float
+screenLowerBound = (-screenUpperBound)
+
+ballRadius :: Float
+ballRadius = 10
+
+ballInitialVelocityX :: Float
+ballInitialVelocityX = 3
+
+ballInitialVelocityY :: Float
+ballInitialVelocityY = 2
+
+batWidth :: Float
+batWidth = 160
+
+batHeight :: Float
+batHeight = 16
+
+batPositionY :: Float
+batPositionY = screenLowerBound + batHeight / 2
