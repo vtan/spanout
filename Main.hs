@@ -14,12 +14,14 @@ type W a b = Wire (Timed Float ()) () Identity a b
 
 type Ball = (V2 Float, V2 Float)
 
-mainWire :: W () Gloss.Picture
-mainWire = proc () -> do
+mainWire :: W Float Gloss.Picture
+mainWire = proc mouseX -> do
   (V2 px py, V2 vx vy) <- ballWire -< ()
   let circ    = Gloss.circle 10
       velLine = Gloss.line [(0, 0), (vx, vy)]
-  returnA -< Gloss.translate px py . Gloss.pictures $ [circ, velLine]
+      ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
+      batPic  = Gloss.translate mouseX (-260) $ Gloss.rectangleWire 100 10
+  returnA -< Gloss.pictures [ballPic, batPic]
 
 ballWire :: W () Ball
 ballWire = proc () -> do
@@ -53,7 +55,7 @@ reflectIfNeeded vel normal
     dotprod = vel `dot` normal
 
 
-type World = (W () Gloss.Picture, Gloss.Picture)
+type World = (W Float Gloss.Picture, Float, Gloss.Picture)
 
 main :: IO ()
 main = Gloss.play disp bg fps world obtainPicture registerEvent performIteration
@@ -61,17 +63,18 @@ main = Gloss.play disp bg fps world obtainPicture registerEvent performIteration
     disp  = Gloss.InWindow "breakout" (960, 540) (100, 100)
     bg    = Gloss.white
     fps   = 60
-    world = (mainWire, Gloss.blank)
+    world = (mainWire, 0, Gloss.blank)
 
 registerEvent :: Gloss.Event -> World -> World
-registerEvent _event world = world
+registerEvent (Gloss.EventMotion (x, _y)) (wire, _x', pic) = (wire, x, pic)
+registerEvent _event                      world            = world
 
 performIteration :: Float -> World -> World
-performIteration dTime (wire, _lastPic) = (wire', pic)
+performIteration dTime (wire, mouseX, _lastPic) = (wire', mouseX, pic)
   where
     timed              = Timed dTime ()
-    input              = Right ()
+    input              = Right mouseX
     (Right pic, wire') = runIdentity $ stepWire wire timed input
 
 obtainPicture :: World -> Gloss.Picture
-obtainPicture (_wire, pic) = pic
+obtainPicture (_wire, _mouseX, pic) = pic
