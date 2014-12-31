@@ -4,8 +4,6 @@ module Main where
 
 import Prelude hiding (id, (.))
 import Control.Wire
-import qualified Data.Bifunctor as Bifunctor
-import Data.Maybe (isJust, fromJust)
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
 import Linear
@@ -34,49 +32,48 @@ ballWire = proc batX -> do
 
 updateBall :: W (Ball, Float) Ball
 updateBall =
-  Bifunctor.first moveBall
-  ^>> (fst ^>> arr bounceBall >>> when isJust >>^ fromJust)
-  <|> (arr (uncurry collideBallBat) >>> when isJust >>^ fromJust)
+  moveBall
+  ^>> (fst ^>> ballEdgeCollisionWire)
+  <|> ballBatCollisionWire
   <|> (fst ^>> when ballAlive)
   <|> (fst ^>> arr (const ballInit))
   where
-    moveBall (pos, vel) = (pos + vel, vel)
+    moveBall ((pos, vel), batX) = ((pos + vel, vel), batX)
     ballAlive (V2 _px py, _vel) = py > screenLowerBound
 
-bounceBall :: Ball -> Maybe Ball
-bounceBall (pos, vel) = do
-  normal <- ballBounceNormal pos
-  vel' <- reflectIfNeeded vel normal
-  return (pos, vel')
+ballEdgeCollisionWire :: W Ball Ball
+ballEdgeCollisionWire = mkPure_ $ \ball@(pos, _vel) ->
+  ballEdgeNormal pos >>= bounceBall ball
 
-collideBallBat :: Ball -> Float -> Maybe Ball
-collideBallBat (pos, vel) batX = do
-  normal <- ballBatCollisionNormal batX pos
-  vel' <- reflectIfNeeded vel normal
-  return (pos, vel')
+ballBatCollisionWire :: W (Ball, Float) Ball
+ballBatCollisionWire = mkPure_ $ \(ball@(pos, _vel), batX) ->
+  ballBatNormal batX pos >>= bounceBall ball
 
-ballBounceNormal :: V2 Float -> Maybe (V2 Float)
-ballBounceNormal (V2 px py)
-  | px <= screenLeftBound  = Just $   unit _x
-  | px >= screenRightBound = Just $ (-unit _x)
-  | py >= screenUpperBound = Just $ (-unit _y)
-  | otherwise              = Nothing
+bounceBall :: Ball -> V2 Float -> Either () Ball
+bounceBall (pos, vel) normal
+  | vel `dot` normal < 0 = Right (pos, vel')
+  | otherwise            = Left ()
+  where
+    vel' = reflect vel normal
 
-ballBatCollisionNormal :: Float -> V2 Float -> Maybe (V2 Float)
-ballBatCollisionNormal batX (V2 px py)
-  | bxl && bxr && by = Just $ unit _y
-  | otherwise        = Nothing
+ballEdgeNormal :: V2 Float -> Either () (V2 Float)
+ballEdgeNormal (V2 px py)
+  | px <= screenLeftBound  = Right $   unit _x
+  | px >= screenRightBound = Right $ (-unit _x)
+  | py >= screenUpperBound = Right $ (-unit _y)
+  | otherwise              = Left ()
+
+ballBatNormal :: Float -> V2 Float -> Either () (V2 Float)
+ballBatNormal batX (V2 px py)
+  | bxl && bxr && by = Right $ unit _y
+  | otherwise        = Left ()
   where
     bxl = px >= batX - batWidth / 2
     bxr = px <= batX + batWidth / 2
     by  = py <= batPositionY + batHeight / 2 + ballRadius
 
-reflectIfNeeded :: V2 Float -> V2 Float -> Maybe (V2 Float)
-reflectIfNeeded vel normal
-  | dotprod < 0 = Just $ vel - (2 * dotprod) *^ normal
-  | otherwise   = Nothing
-  where
-    dotprod = vel `dot` normal
+reflect :: Num a => V2 a -> V2 a -> V2 a
+reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
 
 type World = (W Float Gloss.Picture, Float, Gloss.Picture)
