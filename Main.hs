@@ -3,19 +3,21 @@
 module Main where
 
 import Prelude hiding (id, (.))
+import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Wire
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
 import Linear
 
 
-type W a b = Wire (Timed Float ()) () Identity a b
+type W a b = Wire (Timed Float ()) () (Reader Float) a b
 
 type Ball = (V2 Float, V2 Float)
 
-mainWire :: W Float Gloss.Picture
-mainWire = proc mouseX -> do
-  (V2 px py, V2 vx vy) <- ballWire -< mouseX
+mainWire :: W () Gloss.Picture
+mainWire = proc () -> do
+  (V2 px py, V2 vx vy) <- ballWire -< ()
+  mouseX <- mkGen_ (const (Right <$> ask)) -< ()
   let circ    = Gloss.circle ballRadius
       velLine = Gloss.line [(0, 0), (vx, vy)]
       ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
@@ -23,31 +25,32 @@ mainWire = proc mouseX -> do
               $ Gloss.rectangleWire batWidth batHeight
   returnA -< Gloss.pictures [ballPic, batPic]
 
-ballWire :: W Float Ball
-ballWire = proc batX -> do
+ballWire :: W () Ball
+ballWire = proc () -> do
   rec
     ball' <- delay ballInit -<  ball
-    ball  <- updateBall     -< (ball', batX)
+    ball  <- updateBall     -< ball'
   returnA -< ball
 
-updateBall :: W (Ball, Float) Ball
+updateBall :: W Ball Ball
 updateBall =
   moveBall
-  ^>> (fst ^>> ballEdgeCollisionWire)
+  ^>> ballEdgeCollisionWire
   <|> ballBatCollisionWire
-  <|> (fst ^>> when ballAlive)
-  <|> (fst ^>> arr (const ballInit))
+  <|> when ballAlive
+  <|> arr (const ballInit)
   where
-    moveBall ((pos, vel), batX) = ((pos + vel, vel), batX)
+    moveBall (pos, vel) = (pos + vel, vel)
     ballAlive (V2 _px py, _vel) = py > screenLowerBound
 
 ballEdgeCollisionWire :: W Ball Ball
 ballEdgeCollisionWire = mkPure_ $ \ball@(pos, _vel) ->
   ballEdgeNormal pos >>= bounceBall ball
 
-ballBatCollisionWire :: W (Ball, Float) Ball
-ballBatCollisionWire = mkPure_ $ \(ball@(pos, _vel), batX) ->
-  ballBatNormal batX pos >>= bounceBall ball
+ballBatCollisionWire :: W Ball Ball
+ballBatCollisionWire = mkGen_ $ \ball@(pos, _vel) -> do
+  batX <- ask
+  return $ ballBatNormal batX pos >>= bounceBall ball
 
 bounceBall :: Ball -> V2 Float -> Either () Ball
 bounceBall (pos, vel) normal
@@ -76,7 +79,7 @@ reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
 
-type World = (W Float Gloss.Picture, Float, Gloss.Picture)
+type World = (W () Gloss.Picture, Float, Gloss.Picture)
 
 main :: IO ()
 main = Gloss.play disp bg fps world obtainPicture registerEvent performIteration
@@ -94,8 +97,8 @@ performIteration :: Float -> World -> World
 performIteration dTime (wire, mouseX, _lastPic) = (wire', mouseX, pic)
   where
     timed              = Timed dTime ()
-    input              = Right mouseX
-    (Right pic, wire') = runIdentity $ stepWire wire timed input
+    input              = Right ()
+    (Right pic, wire') = runReader (stepWire wire timed input) mouseX
 
 obtainPicture :: World -> Gloss.Picture
 obtainPicture (_wire, _mouseX, pic) = pic
