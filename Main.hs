@@ -74,12 +74,17 @@ ballEdgeNormal (V2 px py)
 
 ballBatNormal :: Float -> V2 Float -> Either () (V2 Float)
 ballBatNormal batX (V2 px py)
-  | bxl && bxr && by = Right $ unit _y
+  | bxl && bxr && by = Right $ batNormal px batX
   | otherwise        = Left ()
   where
     bxl = px >= batX - batWidth / 2
     bxr = px <= batX + batWidth / 2
     by  = py <= batPositionY + batHeight / 2 + ballRadius
+
+batNormal :: Float -> Float -> V2 Float
+batNormal x batX = perp . angle $ batSpread * relX
+  where
+    relX = (batX - x) / (batWidth / 2)
 
 reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
@@ -132,7 +137,7 @@ ballRadius :: Float
 ballRadius = 10
 
 ballInit :: Ball
-ballInit = (0, V2 3 2)
+ballInit = (0, V2 0 (-5))
 
 batWidth :: Float
 batWidth = 160
@@ -142,3 +147,6 @@ batHeight = 16
 
 batPositionY :: Float
 batPositionY = screenLowerBound + batHeight / 2
+
+batSpread :: Float
+batSpread = pi / 6
