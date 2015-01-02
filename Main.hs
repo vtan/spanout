@@ -10,6 +10,9 @@ import Control.Category
 import Control.Monad.Reader (Reader, runReader, ask)
 import qualified Control.Wire as Wire
 
+import Data.Bifunctor (bimap)
+import Data.Either (partitionEithers)
+
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
 
@@ -20,22 +23,19 @@ type W a b = Wire.Wire (Wire.Timed Float ()) () (Reader Float) a b
 
 type Ball = (V2 Float, V2 Float)
 type Brick = (V2 Float, Float)
-type State = (Ball, Maybe Brick)
+type State = (Ball, [Brick])
 
 mainWire :: W () Gloss.Picture
 mainWire = proc () -> do
-  ((V2 px py, V2 vx vy), maybeBrick) <- gameWire -< ()
+  ((V2 px py, V2 vx vy), bricks) <- gameWire -< ()
   mouseX <- Wire.mkGen_ (const (Right <$> ask)) -< ()
-  let circ    = Gloss.circle ballRadius
-      velLine = Gloss.line [(0, 0), (vx, vy)]
-      ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
-      batPic  = Gloss.translate mouseX batPositionY
-              $ Gloss.rectangleWire batWidth batHeight
-      brickPic =
-        case maybeBrick of
-          Just (V2 bx by, r) -> Gloss.translate bx by $ Gloss.circle r
-          Nothing            -> Gloss.blank
-  returnA -< Gloss.pictures [ballPic, batPic, brickPic]
+  let circ      = Gloss.circle ballRadius
+      velLine   = Gloss.line [(0, 0), (vx, vy)]
+      ballPic   = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
+      batPic    = Gloss.translate mouseX batPositionY
+                $ Gloss.rectangleWire batWidth batHeight
+      brickPics = [Gloss.translate x y $ Gloss.circle r | (V2 x y, r) <- bricks]
+  returnA -< Gloss.pictures $ [ballPic, batPic] ++ brickPics
 
 gameWire :: W () State
 gameWire = proc () -> do
@@ -66,12 +66,14 @@ collideBallBat = Wire.mkGen_ $ \ball@(pos, _vel) -> do
   return $ ballBatNormal batX pos >>= bounceBall ball
 
 collideBallBrick :: W State State
-collideBallBrick = Wire.mkPure_ $ \(ball@(pos, _vel), maybeBrick) ->
-  case maybeBrick of
-    (Just brick) -> do
-      ball' <- ballBrickNormal brick pos >>= bounceBall ball
-      return (ball', Nothing)
-    Nothing -> Left ()
+collideBallBrick = Wire.mkPure_ $ \(ball@(pos, _vel), bricks) ->
+  let check brick = bimap (const brick) id $ ballBrickNormal brick pos
+      bricks' = map check bricks
+      (remBricks, collisionNormals) = partitionEithers bricks'
+      normal = normalize $ sum collisionNormals
+  in  case collisionNormals of
+        [] -> Left ()
+        _  -> (,) <$> bounceBall ball normal <*> pure remBricks
 
 bounceBall :: Ball -> V2 Float -> Either () Ball
 bounceBall (pos, vel) normal
@@ -171,4 +173,11 @@ batSpread :: Float
 batSpread = pi / 6
 
 stateInit :: State
-stateInit = ((0, V2 0 (-5)), Just (V2 100 100, 20))
+stateInit =
+  ( (V2 0 0, V2 0 (-5))
+  , [ (V2  (-20) 100, 20)
+    , (V2    20  100, 20)
+    , (V2   250  150, 30)
+    , (V2 (-250) 150, 30)
+    ]
+  )
