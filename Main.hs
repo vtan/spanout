@@ -17,7 +17,6 @@ import qualified Control.Wire as Wire
 
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
-import Data.Semigroup ((<>), First(..), getFirst)
 
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
@@ -28,12 +27,9 @@ import Linear
 
 type a ->> b = Wire (Wire.Timed Float ()) () (Reader Float) a b
 
-mergeL :: Maybe a -> Maybe a -> Maybe a
-mergeL x y = getFirst $ First x <> First y
-
 infixr 5 &>
 (&>) :: (a ->> Maybe b) -> (a ->> Maybe b) -> (a ->> Maybe b)
-(&>) = liftA2 mergeL
+(&>) = liftA2 (<|>)
 
 infix 4 &|
 (&|) :: (a ->> Maybe b) -> (a ->> b) -> (a ->> b)
