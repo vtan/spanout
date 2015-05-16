@@ -1,5 +1,6 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Main where
@@ -37,7 +38,12 @@ infix 4 <+|
 
 type Ball = (V2 Float, V2 Float)
 type Brick = (V2 Float, Float)
-type State = (Ball, [Brick])
+
+data GameState = GameState
+  { _gsBall :: Ball
+  , _gsBricks :: [Brick]
+  }
+makeLenses ''GameState
 
 overW :: Arrow p => Lens s s a a -> p a a -> p s s
 overW l w = proc a -> do
@@ -51,32 +57,34 @@ overI l w = proc a -> do
 
 
 
-mainWire :: () ->> Gloss.Picture
-mainWire = proc () -> do
-  ((V2 px py, V2 vx vy), bricks) <- gameWire -< ()
+mainWire :: a ->> Gloss.Picture
+mainWire = proc _ -> do
+  gs <- gameWire -< ()
   mouseX <- Wire.mkGen_ (const (Right <$> ask)) -< ()
-  let circ      = Gloss.circle ballRadius
-      velLine   = Gloss.line [(0, 0), (vx, vy)]
-      ballPic   = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
-      batPic    = Gloss.translate mouseX batPositionY
-                $ Gloss.rectangleWire batWidth batHeight
-      brickPics = [Gloss.translate x y $ Gloss.circle r | (V2 x y, r) <- bricks]
+  let (V2 px py, V2 vx vy) = view gsBall gs
+      circ = Gloss.circle ballRadius
+      velLine = Gloss.line [(0, 0), (vx, vy)]
+      ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
+      batPic = Gloss.translate mouseX batPositionY
+             $ Gloss.rectangleWire batWidth batHeight
+      brickPics = [ Gloss.translate x y $ Gloss.circle r
+                  | (V2 x y, r) <- view gsBricks gs]
   returnA -< Gloss.pictures $ [ballPic, batPic] ++ brickPics
 
-gameWire :: () ->> State
-gameWire = proc () -> do
+gameWire :: a ->> GameState
+gameWire = proc _ -> do
   rec
     state' <- Wire.delay stateInit -< state
     state <- updateGame -< state'
   returnA -< state
 
-updateGame :: State ->> State
+updateGame :: GameState ->> GameState
 updateGame =
-      over _1 moveBall
+      over gsBall moveBall
   ^>> collideBallBrick
-  <+> overI _1 collideBallEdge
-  <+> overI _1 collideBallBat
-  <+> overI _1 ballAlive
+  <+> overI gsBall collideBallEdge
+  <+> overI gsBall collideBallBat
+  <+> overI gsBall ballAlive
   <+| pure stateInit
   where
     moveBall (pos, vel) = (pos + vel, vel)
@@ -96,21 +104,21 @@ collideBallBat = proc ball@(pos, _vel) -> do
   batX <- constM ask -< ()
   returnA -< bounceBall ball =<< ballBatNormal batX pos
 
-collideBallBrick :: State ->> Maybe State
-collideBallBrick = proc (ball@(pos, _vel), bricks) -> do
+collideBallBrick :: GameState ->> Maybe GameState
+collideBallBrick = proc gs -> do
   let
     check brick =
-      case ballBrickNormal brick pos of
+      case ballBrickNormal brick $ view (gsBall . _1) gs of
         Nothing     -> Left brick
         Just normal -> Right normal
-    bricks' = map check bricks
+    bricks' = map check $ view gsBricks gs
     (remBricks, collisionNormals) = partitionEithers bricks'
   returnA -<
     case collisionNormals of
       [] -> Nothing
       _  ->
         let normal = normalize $ sum collisionNormals
-        in  (,) <$> bounceBall ball normal <*> Just remBricks
+        in  GameState <$> bounceBall (view gsBall gs) normal <*> Just remBricks
 
 
 
@@ -216,12 +224,13 @@ batPositionY = screenLowerBound + batHeight / 2
 batSpread :: Float
 batSpread = pi / 6
 
-stateInit :: State
-stateInit =
-  ( (V2 0 0, V2 0 (-5))
-  , [ (V2  (-20) 100, 20)
+stateInit :: GameState
+stateInit = GameState
+  { _gsBall = (V2 0 0, V2 0 (-5))
+  , _gsBricks =
+    [ (V2  (-20) 100, 20)
     , (V2    20  100, 20)
     , (V2   250  150, 30)
     , (V2 (-250) 150, 30)
     ]
-  )
+  }
