@@ -7,7 +7,7 @@ module Main where
 import Prelude hiding (id, (.))
 
 import Control.Applicative
-import Control.Arrow
+import Control.Arrow hiding ((<+>))
 import Control.Category
 import Control.Lens
 import Control.Monad (liftM)
@@ -27,13 +27,13 @@ import Linear
 
 type a ->> b = Wire (Wire.Timed Float ()) () (Reader Float) a b
 
-infixr 5 &>
-(&>) :: (a ->> Maybe b) -> (a ->> Maybe b) -> (a ->> Maybe b)
-(&>) = liftA2 (<|>)
+infixr 5 <+>
+(<+>) :: (a ->> Maybe b) -> (a ->> Maybe b) -> (a ->> Maybe b)
+(<+>) = liftA2 (<|>)
 
-infix 4 &|
-(&|) :: (a ->> Maybe b) -> (a ->> b) -> (a ->> b)
-(&|) = liftA2 $ flip fromMaybe
+infix 4 <+|
+(<+|) :: (a ->> Maybe b) -> (a ->> b) -> (a ->> b)
+(<+|) = liftA2 $ flip fromMaybe
 
 type Ball = (V2 Float, V2 Float)
 type Brick = (V2 Float, Float)
@@ -74,10 +74,10 @@ updateGame :: State ->> State
 updateGame =
       over _1 moveBall
   ^>> collideBallBrick
-   &> overI _1 collideBallEdge
-   &> overI _1 collideBallBat
-   &> overI _1 ballAlive
-   &| pure stateInit
+  <+> overI _1 collideBallEdge
+  <+> overI _1 collideBallBat
+  <+> overI _1 ballAlive
+  <+| pure stateInit
   where
     moveBall (pos, vel) = (pos + vel, vel)
 
