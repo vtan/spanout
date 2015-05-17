@@ -11,7 +11,7 @@ import Control.Applicative
 import Control.Arrow hiding ((<+>))
 import Control.Category
 import Control.Lens
-import Control.Monad (liftM)
+import Control.Monad (guard, liftM)
 import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Wire (Wire)
 import qualified Control.Wire as Wire
@@ -79,8 +79,9 @@ data Brick = Brick
 makeLenses ''Brick
 
 data GameState = GameState
-  { _gsBall :: Ball
-  , _gsBricks :: [Brick]
+  { _gsBall          :: Ball
+  , _gsBricks        :: [Brick]
+  , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
   }
 makeLenses ''GameState
 
@@ -99,7 +100,24 @@ gameDisplay = proc gs -> do
            $ Gloss.rectangleWire batWidth batHeight
     brickPics = [ Gloss.translate x y $ Gloss.circle r
                 | Brick (V2 x y) r <- view gsBricks gs]
-  returnA -< Gloss.pictures $ [ballPic, batPic] ++ brickPics
+    lastCollPic = displayLastColl $ view gsLastCollision gs
+  returnA -< Gloss.pictures $ [lastCollPic, ballPic, batPic] ++ brickPics
+
+displayLastColl ::
+  Maybe (V2 Float, V2 Float, V2 Float, V2 Float) -> Gloss.Picture
+displayLastColl = fromMaybe Gloss.blank . fmap pics
+  where
+    pics (pos, before, normal, after) =
+      let
+        before' = (pos - 50 *^ normalize before, pos)
+        normal' = (pos, pos + 50 *^ normal)
+        after'  = (pos, pos + 50 *^ normalize after)
+      in
+        Gloss.pictures $ zipWith Gloss.color
+          [Gloss.red, Gloss.green, Gloss.blue]
+          (map (uncurry line) [before', normal', after'])
+    line (V2 ux uy) (V2 vx vy) = Gloss.line [(ux, uy), (vx, vy)]
+
 
 gameLogic :: a ->> Maybe GameState
 gameLogic = proc _ -> do
@@ -110,8 +128,8 @@ gameLogic = proc _ -> do
   where
     update = over  gsBall moveBall
          ^>>              collideBallBrick
-         <+> overI gsBall collideBallEdge
-         <+> overI gsBall collideBallBat
+         <+>              collideBallEdge
+         <+>              collideBallBat
          <+> overI gsBall ballAlive
     moveBall (Ball pos vel) = Ball (pos + vel) vel
 
@@ -121,29 +139,57 @@ ballAlive = arr $ \ball ->
   then Just ball
   else Nothing
 
-collideBallEdge :: Ball ->> Maybe Ball
-collideBallEdge = arr $ \ball ->
-  bounceBall ball =<< ballEdgeNormal (view ballPos ball)
+collideBallEdge :: GameState ->> Maybe GameState
+collideBallEdge = arr $ \gs -> do
+  let
+    ball = view gsBall gs
+    pos = view ballPos ball
+  normal <- ballEdgeNormal pos
+  bouncedBall <- bounceBall ball normal
+  let coll = (pos, view ballVel ball, normal, view ballVel bouncedBall)
+  Just $
+      set gsBall bouncedBall
+    . set gsLastCollision (Just coll)
+    $ gs
 
-collideBallBat :: Ball ->> Maybe Ball
-collideBallBat = proc ball -> do
-  batX <- constM ask -< ()
-  returnA -< bounceBall ball =<< ballBatNormal batX (view ballPos ball)
+collideBallBat :: GameState ->> Maybe GameState
+collideBallBat = arr f <<< (id &&& constM ask)
+  where
+    f (gs, batX) = do
+      let
+        ball = view gsBall gs
+        pos = view ballPos ball
+      normal <- ballBatNormal batX pos
+      bouncedBall <- bounceBall ball normal
+      let coll = (pos, view ballVel ball, normal, view ballVel bouncedBall)
+      Just $
+          set gsBall bouncedBall
+        . set gsLastCollision (Just coll)
+        $ gs
 
 collideBallBrick :: GameState ->> Maybe GameState
 collideBallBrick = arr $ \gs -> do
   let
+    ball = view gsBall gs
     check brick =
-      case ballBrickNormal brick (view gsBall gs) of
+      case ballBrickNormal brick ball of
         Nothing     -> Left brick
         Just normal -> Right normal
     bricks' = map check $ view gsBricks gs
     (remBricks, collisionNormals) = partitionEithers bricks'
-  case collisionNormals of
-    [] -> Nothing
-    _  ->
-      let normal = normalize $ sum collisionNormals
-      in  GameState <$> bounceBall (view gsBall gs) normal <*> Just remBricks
+  guard . not . null $ collisionNormals
+  let normal = normalize . sum $ collisionNormals
+  bouncedBall <- bounceBall ball normal
+  let coll = ( view ballPos ball
+             , view ballVel ball
+             , normal
+             , view ballVel bouncedBall
+             )
+  Just $
+      set gsBall bouncedBall
+    . set gsBricks remBricks
+    . set gsLastCollision (Just coll)
+    $ gs
 
 
 
@@ -255,4 +301,5 @@ stateInit = GameState
     , Brick (V2   250  150) 30
     , Brick (V2 (-250) 150) 30
     ]
+  , _gsLastCollision = Nothing
   }
