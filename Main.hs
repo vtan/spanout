@@ -17,7 +17,7 @@ import Control.Wire (Wire)
 import qualified Control.Wire as Wire
 
 import Data.Either (partitionEithers)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, fromJust)
 
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
@@ -36,14 +36,8 @@ infix 4 <+|
 (<+|) :: (a ->> Maybe b) -> (a ->> b) -> (a ->> b)
 (<+|) = liftA2 $ flip fromMaybe
 
-type Ball = (V2 Float, V2 Float)
-type Brick = (V2 Float, Float)
-
-data GameState = GameState
-  { _gsBall :: Ball
-  , _gsBricks :: [Brick]
-  }
-makeLenses ''GameState
+constM :: Monad m => m b -> Wire s e m a b
+constM m = Wire.mkGen_ . const $ liftM Right m
 
 overW :: Arrow p => Lens s s a a -> p a a -> p s s
 overW l w = proc a -> do
@@ -55,38 +49,61 @@ overI l w = proc a -> do
   ms <- w -< view l a
   returnA -< fmap (\s -> set l s a) ms
 
+infixr 9 .?
+(.?) :: ArrowChoice p => p b c -> p a (Maybe b) -> p a (Maybe c)
+p1 .? p2 = proc a -> do
+  mb <- p2 -< a
+  case mb of
+    Just b  -> Just ^<< p1 -< b
+    Nothing -> returnA -< Nothing
+
+infixr 1 -->
+(-->) :: (Monad m, Monoid s)
+  => Wire s e m a (Maybe b) -> Wire s e m a b -> Wire s e m a b
+w1 --> w2 = Wire.mkGen $ \s a -> do
+  (Right mb, w1') <- Wire.stepWire w1 s (Right a)
+  case mb of
+    Nothing -> Wire.stepWire w2 s (Right a)
+    Just b  -> return (Right b, w1' --> w2)
+
+type Ball = (V2 Float, V2 Float)
+type Brick = (V2 Float, Float)
+
+data GameState = GameState
+  { _gsBall :: Ball
+  , _gsBricks :: [Brick]
+  }
+makeLenses ''GameState
+
 
 
 mainWire :: a ->> Gloss.Picture
-mainWire = proc _ -> do
-  gs <- gameWire -< ()
-  mouseX <- Wire.mkGen_ (const (Right <$> ask)) -< ()
-  let (V2 px py, V2 vx vy) = view gsBall gs
-      circ = Gloss.circle ballRadius
-      velLine = Gloss.line [(0, 0), (vx, vy)]
-      ballPic = Gloss.translate px py . Gloss.pictures $ [circ, velLine]
-      batPic = Gloss.translate mouseX batPositionY
-             $ Gloss.rectangleWire batWidth batHeight
-      brickPics = [ Gloss.translate x y $ Gloss.circle r
-                  | (V2 x y, r) <- view gsBricks gs]
+mainWire = (gameDisplay .? gameLogic) --> mainWire
+
+gameDisplay :: GameState ->> Gloss.Picture
+gameDisplay = proc gs -> do
+  mouseX <- constM ask -< ()
+  let
+    V2 px py = view (gsBall . _1) gs
+    ballPic = Gloss.translate px py $ Gloss.circle ballRadius
+    batPic = Gloss.translate mouseX batPositionY
+           $ Gloss.rectangleWire batWidth batHeight
+    brickPics = [ Gloss.translate x y $ Gloss.circle r
+                | (V2 x y, r) <- view gsBricks gs]
   returnA -< Gloss.pictures $ [ballPic, batPic] ++ brickPics
 
-gameWire :: a ->> GameState
-gameWire = proc _ -> do
+gameLogic :: a ->> Maybe GameState
+gameLogic = proc _ -> do
   rec
-    state' <- Wire.delay stateInit -< state
-    state <- updateGame -< state'
-  returnA -< state
-
-updateGame :: GameState ->> GameState
-updateGame =
-      over gsBall moveBall
-  ^>> collideBallBrick
-  <+> overI gsBall collideBallEdge
-  <+> overI gsBall collideBallBat
-  <+> overI gsBall ballAlive
-  <+| pure stateInit
+    state' <- update . Wire.delay stateInit -< state
+    let state = fromJust state'
+  returnA -< state'
   where
+    update = over  gsBall moveBall
+         ^>>              collideBallBrick
+         <+> overI gsBall collideBallEdge
+         <+> overI gsBall collideBallBat
+         <+> overI gsBall ballAlive
     moveBall (pos, vel) = (pos + vel, vel)
 
 ballAlive :: Ball ->> Maybe Ball
@@ -105,7 +122,7 @@ collideBallBat = proc ball@(pos, _vel) -> do
   returnA -< bounceBall ball =<< ballBatNormal batX pos
 
 collideBallBrick :: GameState ->> Maybe GameState
-collideBallBrick = proc gs -> do
+collideBallBrick = arr $ \gs -> do
   let
     check brick =
       case ballBrickNormal brick $ view (gsBall . _1) gs of
@@ -113,12 +130,11 @@ collideBallBrick = proc gs -> do
         Just normal -> Right normal
     bricks' = map check $ view gsBricks gs
     (remBricks, collisionNormals) = partitionEithers bricks'
-  returnA -<
-    case collisionNormals of
-      [] -> Nothing
-      _  ->
-        let normal = normalize $ sum collisionNormals
-        in  GameState <$> bounceBall (view gsBall gs) normal <*> Just remBricks
+  case collisionNormals of
+    [] -> Nothing
+    _  ->
+      let normal = normalize $ sum collisionNormals
+      in  GameState <$> bounceBall (view gsBall gs) normal <*> Just remBricks
 
 
 
@@ -161,9 +177,6 @@ reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
 
-
-constM :: Monad m => m b -> Wire s e m a b
-constM m = Wire.mkGen_ . const $ liftM Right m
 
 type World = (() ->> Gloss.Picture, Float, Gloss.Picture)
 
