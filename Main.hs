@@ -66,8 +66,17 @@ w1 --> w2 = Wire.mkGen $ \s a -> do
     Nothing -> Wire.stepWire w2 s (Right a)
     Just b  -> return (Right b, w1' --> w2)
 
-type Ball = (V2 Float, V2 Float)
-type Brick = (V2 Float, Float)
+data Ball = Ball
+  { _ballPos :: V2 Float
+  , _ballVel :: V2 Float
+  }
+makeLenses ''Ball
+
+data Brick = Brick
+  { _brickCenter :: V2 Float
+  , _brickRadius :: Float
+  }
+makeLenses ''Brick
 
 data GameState = GameState
   { _gsBall :: Ball
@@ -84,12 +93,12 @@ gameDisplay :: GameState ->> Gloss.Picture
 gameDisplay = proc gs -> do
   mouseX <- constM ask -< ()
   let
-    V2 px py = view (gsBall . _1) gs
+    V2 px py = view (gsBall . ballPos) gs
     ballPic = Gloss.translate px py $ Gloss.circle ballRadius
     batPic = Gloss.translate mouseX batPositionY
            $ Gloss.rectangleWire batWidth batHeight
     brickPics = [ Gloss.translate x y $ Gloss.circle r
-                | (V2 x y, r) <- view gsBricks gs]
+                | Brick (V2 x y) r <- view gsBricks gs]
   returnA -< Gloss.pictures $ [ballPic, batPic] ++ brickPics
 
 gameLogic :: a ->> Maybe GameState
@@ -104,28 +113,28 @@ gameLogic = proc _ -> do
          <+> overI gsBall collideBallEdge
          <+> overI gsBall collideBallBat
          <+> overI gsBall ballAlive
-    moveBall (pos, vel) = (pos + vel, vel)
+    moveBall (Ball pos vel) = Ball (pos + vel) vel
 
 ballAlive :: Ball ->> Maybe Ball
-ballAlive = arr $ \ball@(V2 _px py, _vel) ->
-  if py > screenLowerBound
+ballAlive = arr $ \ball ->
+  if view (ballPos . _y) ball > screenLowerBound
   then Just ball
   else Nothing
 
 collideBallEdge :: Ball ->> Maybe Ball
-collideBallEdge = arr $ \ball@(pos, _vel) ->
-  bounceBall ball =<< ballEdgeNormal pos
+collideBallEdge = arr $ \ball ->
+  bounceBall ball =<< ballEdgeNormal (view ballPos ball)
 
 collideBallBat :: Ball ->> Maybe Ball
-collideBallBat = proc ball@(pos, _vel) -> do
+collideBallBat = proc ball -> do
   batX <- constM ask -< ()
-  returnA -< bounceBall ball =<< ballBatNormal batX pos
+  returnA -< bounceBall ball =<< ballBatNormal batX (view ballPos ball)
 
 collideBallBrick :: GameState ->> Maybe GameState
 collideBallBrick = arr $ \gs -> do
   let
     check brick =
-      case ballBrickNormal brick $ view (gsBall . _1) gs of
+      case ballBrickNormal brick (view gsBall gs) of
         Nothing     -> Left brick
         Just normal -> Right normal
     bricks' = map check $ view gsBricks gs
@@ -139,8 +148,8 @@ collideBallBrick = arr $ \gs -> do
 
 
 bounceBall :: Ball -> V2 Float -> Maybe Ball
-bounceBall (pos, vel) normal
-  | vel `dot` normal < 0 = Just (pos, vel')
+bounceBall (Ball pos vel) normal
+  | vel `dot` normal < 0 = Just $ Ball pos vel'
   | otherwise            = Nothing
   where
     vel' = reflect vel normal
@@ -161,12 +170,12 @@ ballBatNormal batX (V2 px py)
     bxr = px <= batX + batWidth / 2
     by  = py <= batPositionY + batHeight / 2 + ballRadius
 
-ballBrickNormal :: Brick -> V2 Float -> Maybe (V2 Float)
-ballBrickNormal (brickPos, brickRadius) pos
-  | hit       = Just . normalize $ pos - brickPos
+ballBrickNormal :: Brick -> Ball -> Maybe (V2 Float)
+ballBrickNormal (Brick pos radius) ball
+  | hit       = Just . normalize $ (view ballPos ball) - pos
   | otherwise = Nothing
   where
-    hit = distance brickPos pos <= brickRadius + ballRadius
+    hit = distance (view ballPos ball) pos <= radius + ballRadius
 
 batNormal :: Float -> Float -> V2 Float
 batNormal x batX = perp . angle $ batSpread * relX
@@ -239,11 +248,11 @@ batSpread = pi / 6
 
 stateInit :: GameState
 stateInit = GameState
-  { _gsBall = (V2 0 0, V2 0 (-5))
+  { _gsBall = Ball (V2 0 0) (V2 0 (-5))
   , _gsBricks =
-    [ (V2  (-20) 100, 20)
-    , (V2    20  100, 20)
-    , (V2   250  150, 30)
-    , (V2 (-250) 150, 30)
+    [ Brick (V2  (-20) 100) 20
+    , Brick (V2    20  100) 20
+    , Brick (V2   250  150) 30
+    , Brick (V2 (-250) 150) 30
     ]
   }
