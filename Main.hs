@@ -19,6 +19,7 @@ import qualified Control.Wire as Wire
 
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe, fromJust)
+import Data.Monoid ((<>))
 
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.IO.Game as Gloss
@@ -102,28 +103,13 @@ gameDisplay = proc gs -> do
   mouseX <- constM ask -< ()
   let
     V2 px py = view (gsBall . ballPos) gs
-    ballPic = Gloss.translate px py $ Gloss.circle ballRadius
+    ballPic = Gloss.translate px py $ circleFilled ballColor ballRadius
     batPic = Gloss.translate mouseX batPositionY
-           $ Gloss.rectangleWire batWidth batHeight
-    brickPics = [ Gloss.translate x y $ Gloss.circle r
+           $ rectangleFilled batColor batWidth batHeight
+    brickPics = [ Gloss.translate x y $ circleFilled brickColor r
                 | Brick (V2 x y) r <- view gsBricks gs]
     lastCollPic = displayLastColl $ view gsLastCollision gs
-  returnA -< Gloss.pictures $ [lastCollPic, ballPic, batPic] ++ brickPics
-
-displayLastColl ::
-  Maybe (V2 Float, V2 Float, V2 Float, V2 Float) -> Gloss.Picture
-displayLastColl = fromMaybe Gloss.blank . fmap pics
-  where
-    pics (pos, before, normal, after) =
-      let
-        before' = (pos - 50 *^ normalize before, pos)
-        normal' = (pos, pos + 50 *^ normal)
-        after'  = (pos, pos + 50 *^ normalize after)
-      in
-        Gloss.pictures $ zipWith Gloss.color
-          [Gloss.red, Gloss.green, Gloss.blue]
-          (map (uncurry line) [before', normal', after'])
-    line (V2 ux uy) (V2 vx vy) = Gloss.line [(ux, uy), (vx, vy)]
+  returnA -< Gloss.pictures $ brickPics ++ [ballPic, batPic, lastCollPic]
 
 gameLogic :: a ->> Maybe GameState
 gameLogic = proc _ -> do
@@ -237,15 +223,39 @@ batNormal x batX = perp . angle $ batSpread * relX
 reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
+circleFilled :: Gloss.Color -> Float -> Gloss.Picture
+circleFilled color radius =
+     Gloss.color color (Gloss.circleSolid radius)
+  <> Gloss.color (Gloss.dark color) (Gloss.circle radius)
+
+rectangleFilled :: Gloss.Color -> Float -> Float -> Gloss.Picture
+rectangleFilled color width height =
+     Gloss.color color (Gloss.rectangleSolid width height)
+  <> Gloss.color (Gloss.dark color) (Gloss.rectangleWire width height)
+
+displayLastColl ::
+  Maybe (V2 Float, V2 Float, V2 Float, V2 Float) -> Gloss.Picture
+displayLastColl = fromMaybe Gloss.blank . fmap pics
+  where
+    pics (pos, before, normal, after) =
+      let
+        before' = (pos - 50 *^ normalize before, pos)
+        normal' = (pos, pos + 50 *^ normal)
+        after'  = (pos, pos + 50 *^ normalize after)
+      in
+        Gloss.pictures $ zipWith Gloss.color
+          [Gloss.aquamarine, Gloss.chartreuse, Gloss.orange]
+          (map (uncurry line) [before', normal', after'])
+    line (V2 ux uy) (V2 vx vy) = Gloss.line [(ux, uy), (vx, vy)]
+
 
 
 type World = (() ->> Gloss.Picture, Float, Gloss.Picture)
 
 main :: IO ()
-main = Gloss.playIO disp bg fps world obtainPicture registerEvent performIteration
+main = Gloss.playIO disp bgColor fps world obtainPicture registerEvent performIteration
   where
     disp  = Gloss.InWindow "breakout" (screenWidth, screenHeight) (100, 100)
-    bg    = Gloss.white
     fps   = 60
     world = (mainWire, 0, Gloss.blank)
 
@@ -312,3 +322,15 @@ stateInit = do
     , _gsBricks = bricks
     , _gsLastCollision = Nothing
     }
+
+bgColor :: Gloss.Color
+bgColor = Gloss.greyN 0.15
+
+ballColor :: Gloss.Color
+ballColor = Gloss.makeColorI 0x69 0x9a 0x33 0xff
+
+batColor :: Gloss.Color
+batColor = Gloss.makeColorI 0x5e 0x85 0x9a 0xff
+
+brickColor :: Gloss.Color
+brickColor = Gloss.makeColorI 0xaa 0x52 0x39 0xff
