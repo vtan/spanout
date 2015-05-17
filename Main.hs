@@ -11,8 +11,9 @@ import Control.Applicative
 import Control.Arrow hiding ((<+>))
 import Control.Category
 import Control.Lens
-import Control.Monad (guard, liftM)
-import Control.Monad.Reader (Reader, runReader, ask)
+import Control.Monad (guard, liftM, replicateM)
+import Control.Monad.Random (MonadRandom, Rand, StdGen, evalRandIO, getRandomR)
+import Control.Monad.Reader (ReaderT, runReaderT, ask)
 import Control.Wire (Wire)
 import qualified Control.Wire as Wire
 
@@ -20,13 +21,14 @@ import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe, fromJust)
 
 import qualified Graphics.Gloss as Gloss
-import qualified Graphics.Gloss.Interface.Pure.Game as Gloss
+import qualified Graphics.Gloss.Interface.IO.Game as Gloss
 
 import Linear
 
 
 
-type a ->> b = Wire (Wire.Timed Float ()) () (Reader Float) a b
+type M = ReaderT Float (Rand StdGen)
+type a ->> b = Wire (Wire.Timed Float ()) () M a b
 
 infixr 5 <+>
 (<+>) :: (a ->> Maybe b) -> (a ->> Maybe b) -> (a ->> Maybe b)
@@ -38,6 +40,11 @@ infix 4 <+|
 
 constM :: Monad m => m b -> Wire s e m a b
 constM m = Wire.mkGen_ . const $ liftM Right m
+
+delayM :: Monad m => m a -> Wire s e m a a
+delayM ma = Wire.mkGenN $ \a' -> do
+  a <- ma
+  return (Right a, Wire.delay a')
 
 overW :: Arrow p => Lens s s a a -> p a a -> p s s
 overW l w = proc a -> do
@@ -118,11 +125,10 @@ displayLastColl = fromMaybe Gloss.blank . fmap pics
           (map (uncurry line) [before', normal', after'])
     line (V2 ux uy) (V2 vx vy) = Gloss.line [(ux, uy), (vx, vy)]
 
-
 gameLogic :: a ->> Maybe GameState
 gameLogic = proc _ -> do
   rec
-    state' <- update . Wire.delay stateInit -< state
+    state' <- update . delayM stateInit -< state
     let state = fromJust state'
   returnA -< state'
   where
@@ -236,26 +242,28 @@ reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 type World = (() ->> Gloss.Picture, Float, Gloss.Picture)
 
 main :: IO ()
-main = Gloss.play disp bg fps world obtainPicture registerEvent performIteration
+main = Gloss.playIO disp bg fps world obtainPicture registerEvent performIteration
   where
     disp  = Gloss.InWindow "breakout" (screenWidth, screenHeight) (100, 100)
     bg    = Gloss.white
     fps   = 60
     world = (mainWire, 0, Gloss.blank)
 
-registerEvent :: Gloss.Event -> World -> World
-registerEvent (Gloss.EventMotion (x, _y)) (wire, _x', pic) = (wire, x, pic)
-registerEvent _event                      world            = world
+registerEvent :: Gloss.Event -> World -> IO World
+registerEvent (Gloss.EventMotion (x, _y)) (wire, _x', pic) = return (wire, x, pic)
+registerEvent _event                      world            = return world
 
-performIteration :: Float -> World -> World
-performIteration dTime (wire, mouseX, _lastPic) = (wire', mouseX, pic)
-  where
-    timed              = Wire.Timed dTime ()
-    input              = Right ()
-    (Right pic, wire') = runReader (Wire.stepWire wire timed input) mouseX
+performIteration :: Float -> World -> IO World
+performIteration dTime (wire, mouseX, _lastPic) = do
+  let
+    timed = Wire.Timed dTime ()
+    input = Right ()
+    mb = Wire.stepWire wire timed input
+  (Right pic, wire') <- evalRandIO $ runReaderT mb mouseX
+  return (wire', mouseX, pic)
 
-obtainPicture :: World -> Gloss.Picture
-obtainPicture (_wire, _mouseX, pic) = pic
+obtainPicture :: World -> IO Gloss.Picture
+obtainPicture (_wire, _mouseX, pic) = return pic
 
 
 
@@ -292,14 +300,15 @@ batPositionY = screenLowerBound + batHeight / 2
 batSpread :: Float
 batSpread = pi / 6
 
-stateInit :: GameState
-stateInit = GameState
-  { _gsBall = Ball (V2 0 0) (V2 0 (-5))
-  , _gsBricks =
-    [ Brick (V2  (-20) 100) 20
-    , Brick (V2    20  100) 20
-    , Brick (V2   250  150) 30
-    , Brick (V2 (-250) 150) 30
-    ]
-  , _gsLastCollision = Nothing
-  }
+stateInit :: MonadRandom m => m GameState
+stateInit = do
+  bricks <- replicateM 10 $ do
+    x <- getRandomR (screenLeftBound, screenRightBound)
+    y <- getRandomR (screenLowerBound, screenUpperBound)
+    r <- getRandomR (10, 50)
+    return $ Brick (V2 x y) r
+  return $ GameState
+    { _gsBall = Ball (V2 0 0) (V2 0 (-5))
+    , _gsBricks = bricks
+    , _gsLastCollision = Nothing
+    }
