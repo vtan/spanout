@@ -34,7 +34,7 @@ import qualified System.Exit as System (exitSuccess)
 
 data Env = Env
   { _envMouse :: V2 Float
-  , _envKeys :: Set Gloss.Key
+  , _envKeys  :: Set Gloss.Key
   }
 makeLenses ''Env
 
@@ -83,9 +83,9 @@ p1 ?.? p2 = proc a -> do
     Just b  -> p1 -< b
     Nothing -> returnA -< Nothing
 
-infixr 1 >>>?
-(>>>?) :: ArrowChoice p => p a (Maybe b) -> p b c -> p a (Maybe c)
-(>>>?) = flip (.?)
+infixr 1 ?>>>
+(?>>>) :: ArrowChoice p => p a (Maybe b) -> p b c -> p a (Maybe c)
+(?>>>) = flip (.?)
 
 infixr 1 ?>>>?
 (?>>>?) :: ArrowChoice p => p a (Maybe b) -> p b (Maybe c) -> p a (Maybe c)
@@ -118,6 +118,7 @@ makeLenses ''Brick
 
 data GameState = GameState
   { _gsBall          :: Ball
+  , _gsBatX          :: Float
   , _gsBricks        :: [Brick]
   , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
   }
@@ -126,7 +127,7 @@ makeLenses ''GameState
 
 
 mainWire :: a ->> Maybe Gloss.Picture
-mainWire = exitOnEsc ?>>>? (gameDisplay .? gameLogic) --> mainWire
+mainWire = exitOnEsc ?>>>? (gameLogic ?>>> gameDisplay) --> mainWire
 
 gameDisplay :: GameState ->> Gloss.Picture
 gameDisplay = proc gs -> do
@@ -150,11 +151,16 @@ gameLogic = proc _ -> do
   where
     update :: GameState ->> Maybe GameState
     update = over gsBall moveBall
-          ^>>? collideBallBrick
+         ^>> moveBat
+           >>> collideBallBrick
            <+> collideBallEdge
            <+> collideBallBat
            <+> overI gsBall ballAlive
     moveBall (Ball pos vel) = Ball (pos + vel) vel
+    moveBat :: GameState ->> GameState
+    moveBat = proc gs -> do
+      x <- constM . view $ envMouse . _x -< ()
+      returnA -< set gsBatX x gs
 
 exitOnEsc :: a ->> Maybe a
 exitOnEsc = proc a -> do
@@ -186,19 +192,17 @@ collideBallEdge = arr $ \gs -> do
     $ gs
 
 collideBallBat :: GameState ->> Maybe GameState
-collideBallBat = arr f <<< (id &&& constM (view $ envMouse . _x))
-  where
-    f (gs, batX) = do
-      let
-        ball = view gsBall gs
-        pos = view ballPos ball
-      normal <- ballBatNormal batX pos
-      bouncedBall <- bounceBall ball normal
-      let coll = (pos, view ballVel ball, normal, view ballVel bouncedBall)
-      Just $
-          set gsBall bouncedBall
-        . set gsLastCollision (Just coll)
-        $ gs
+collideBallBat = arr $ \gs -> do
+  let
+    ball = view gsBall gs
+    pos = view ballPos ball
+  normal <- ballBatNormal (view gsBatX gs) pos
+  bouncedBall <- bounceBall ball normal
+  let coll = (pos, view ballVel ball, normal, view ballVel bouncedBall)
+  Just $
+      set gsBall bouncedBall
+    . set gsLastCollision (Just coll)
+    $ gs
 
 collideBallBrick :: GameState ->> Maybe GameState
 collideBallBrick = arr $ \gs -> do
@@ -362,7 +366,7 @@ batPositionY :: Float
 batPositionY = screenLowerBound + batHeight / 2
 
 batSpread :: Float
-batSpread = pi / 6
+batSpread = pi / 12
 
 stateInit :: MonadRandom m => m GameState
 stateInit = do
@@ -373,6 +377,7 @@ stateInit = do
     return $ Brick (V2 x y) r
   return $ GameState
     { _gsBall = Ball (V2 0 0) (V2 0 (-5))
+    , _gsBatX = 0
     , _gsBricks = bricks
     , _gsLastCollision = Nothing
     }
