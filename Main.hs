@@ -13,22 +13,32 @@ import Control.Category
 import Control.Lens
 import Control.Monad (guard, liftM, replicateM)
 import Control.Monad.Random (MonadRandom, Rand, StdGen, evalRandIO, getRandomR)
-import Control.Monad.Reader (ReaderT, runReaderT, ask)
+import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Wire (Wire)
 import qualified Control.Wire as Wire
 
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe, fromJust)
 import Data.Monoid ((<>))
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 import qualified Graphics.Gloss as Gloss
 import qualified Graphics.Gloss.Interface.IO.Game as Gloss
 
 import Linear
 
+import qualified System.Exit as System (exitSuccess)
 
 
-type M = ReaderT Float (Rand StdGen)
+
+data Env = Env
+  { _envMouse :: V2 Float
+  , _envKeys :: Set Gloss.Key
+  }
+makeLenses ''Env
+
+type M = ReaderT Env (Rand StdGen)
 type a ->> b = Wire (Wire.Timed Float ()) () M a b
 
 infixr 5 <+>
@@ -65,14 +75,34 @@ p1 .? p2 = proc a -> do
     Just b  -> Just ^<< p1 -< b
     Nothing -> returnA -< Nothing
 
+infixr 9 ?.?
+(?.?) :: ArrowChoice p => p b (Maybe c) -> p a (Maybe b) -> p a (Maybe c)
+p1 ?.? p2 = proc a -> do
+  mb <- p2 -< a
+  case mb of
+    Just b  -> p1 -< b
+    Nothing -> returnA -< Nothing
+
+infixr 1 >>>?
+(>>>?) :: ArrowChoice p => p a (Maybe b) -> p b c -> p a (Maybe c)
+(>>>?) = flip (.?)
+
+infixr 1 ?>>>?
+(?>>>?) :: ArrowChoice p => p a (Maybe b) -> p b (Maybe c) -> p a (Maybe c)
+(?>>>?) = flip (?.?)
+
+infixr 1 ^>>?
+(^>>?) :: Arrow p => (a -> b) -> p b (Maybe c) -> p a (Maybe c)
+f ^>>? p = arr f >>> p
+
 infixr 1 -->
 (-->) :: (Monad m, Monoid s)
-  => Wire s e m a (Maybe b) -> Wire s e m a b -> Wire s e m a b
+  => Wire s e m a (Maybe b) -> Wire s e m a (Maybe b) -> Wire s e m a (Maybe b)
 w1 --> w2 = Wire.mkGen $ \s a -> do
   (Right mb, w1') <- Wire.stepWire w1 s (Right a)
   case mb of
     Nothing -> Wire.stepWire w2 s (Right a)
-    Just b  -> return (Right b, w1' --> w2)
+    Just b  -> return (Right $ Just b, w1' --> w2)
 
 data Ball = Ball
   { _ballPos :: V2 Float
@@ -95,12 +125,12 @@ makeLenses ''GameState
 
 
 
-mainWire :: a ->> Gloss.Picture
-mainWire = (gameDisplay .? gameLogic) --> mainWire
+mainWire :: a ->> Maybe Gloss.Picture
+mainWire = exitOnEsc ?>>>? (gameDisplay .? gameLogic) --> mainWire
 
 gameDisplay :: GameState ->> Gloss.Picture
 gameDisplay = proc gs -> do
-  mouseX <- constM ask -< ()
+  mouseX <- constM . view $ envMouse . _x -< ()
   let
     V2 px py = view (gsBall . ballPos) gs
     ballPic = Gloss.translate px py $ circleFilled ballColor ballRadius
@@ -118,12 +148,23 @@ gameLogic = proc _ -> do
     let state = fromJust state'
   returnA -< state'
   where
-    update = over  gsBall moveBall
-         ^>>              collideBallBrick
-         <+>              collideBallEdge
-         <+>              collideBallBat
-         <+> overI gsBall ballAlive
+    update :: GameState ->> Maybe GameState
+    update = over gsBall moveBall
+          ^>>? collideBallBrick
+           <+> collideBallEdge
+           <+> collideBallBat
+           <+> overI gsBall ballAlive
     moveBall (Ball pos vel) = Ball (pos + vel) vel
+
+exitOnEsc :: a ->> Maybe a
+exitOnEsc = proc a -> do
+  keys <- constM $ view envKeys -< ()
+  returnA -<
+    if Set.notMember esc keys
+      then Just a
+      else Nothing
+  where
+    esc = Gloss.SpecialKey Gloss.KeyEsc
 
 ballAlive :: Ball ->> Maybe Ball
 ballAlive = arr $ \ball ->
@@ -145,7 +186,7 @@ collideBallEdge = arr $ \gs -> do
     $ gs
 
 collideBallBat :: GameState ->> Maybe GameState
-collideBallBat = arr f <<< (id &&& constM ask)
+collideBallBat = arr f <<< (id &&& constM (view $ envMouse . _x))
   where
     f (gs, batX) = do
       let
@@ -250,18 +291,29 @@ displayLastColl = fromMaybe Gloss.blank . fmap pics
 
 
 
-type World = (() ->> Gloss.Picture, Float, Gloss.Picture)
+type World = (() ->> Maybe Gloss.Picture, Env, Gloss.Picture)
 
 main :: IO ()
 main = Gloss.playIO disp bgColor fps world obtainPicture registerEvent performIteration
   where
-    disp  = Gloss.InWindow "breakout" (screenWidth, screenHeight) (100, 100)
-    fps   = 60
-    world = (mainWire, 0, Gloss.blank)
+    disp = Gloss.InWindow "breakout" (screenWidth, screenHeight) (100, 100)
+    fps = 60
+    world = (mainWire, env, Gloss.blank)
+    env = Env
+      { _envMouse = zero
+      , _envKeys  = Set.empty
+      }
+
 
 registerEvent :: Gloss.Event -> World -> IO World
-registerEvent (Gloss.EventMotion (x, _y)) (wire, _x', pic) = return (wire, x, pic)
-registerEvent _event                      world            = return world
+registerEvent (Gloss.EventMotion (x, y)) world =
+  return $ set (_2 . envMouse) (V2 x y) world
+registerEvent (Gloss.EventKey key Gloss.Down _ _) world =
+  return $ over (_2 . envKeys) (Set.insert key) world
+registerEvent (Gloss.EventKey key Gloss.Up _ _) world =
+  return $ over (_2 . envKeys) (Set.delete key) world
+registerEvent _event world =
+  return world
 
 performIteration :: Float -> World -> IO World
 performIteration dTime (wire, mouseX, _lastPic) = do
@@ -269,8 +321,10 @@ performIteration dTime (wire, mouseX, _lastPic) = do
     timed = Wire.Timed dTime ()
     input = Right ()
     mb = Wire.stepWire wire timed input
-  (Right pic, wire') <- evalRandIO $ runReaderT mb mouseX
-  return (wire', mouseX, pic)
+  (Right mpic, wire') <- evalRandIO $ runReaderT mb mouseX
+  case mpic of
+    Just pic -> return (wire', mouseX, pic)
+    Nothing  -> System.exitSuccess
 
 obtainPicture :: World -> IO Gloss.Picture
 obtainPicture (_wire, _mouseX, pic) = return pic
