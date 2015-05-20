@@ -87,6 +87,14 @@ infixr 1 ?>>>
 (?>>>) :: ArrowChoice p => p a (Maybe b) -> p b c -> p a (Maybe c)
 (?>>>) = flip (.?)
 
+infixr 1 ??>>>
+(??>>>) :: ArrowChoice p => p a (Either e b) -> p b c -> p a (Either e c)
+p1 ??>>> p2 = proc a -> do
+  eb <- p1 -< a
+  case eb of
+    Left  e -> returnA -< Left e
+    Right b -> Right ^<< p2 -< b
+
 infixr 1 ?>>>?
 (?>>>?) :: ArrowChoice p => p a (Maybe b) -> p b (Maybe c) -> p a (Maybe c)
 (?>>>?) = flip (?.?)
@@ -95,14 +103,32 @@ infixr 1 ^>>?
 (^>>?) :: Arrow p => (a -> b) -> p b (Maybe c) -> p a (Maybe c)
 f ^>>? p = arr f >>> p
 
-infixr 1 -->
-(-->) :: (Monad m, Monoid s)
-  => Wire s e m a (Maybe b) -> Wire s e m a (Maybe b) -> Wire s e m a (Maybe b)
-w1 --> w2 = Wire.mkGen $ \s a -> do
-  (Right mb, w1') <- Wire.stepWire w1 s (Right a)
-  case mb of
-    Nothing -> Wire.stepWire w2 s (Right a)
-    Just b  -> return (Right $ Just b, w1' --> w2)
+switch :: (Monad m, Monoid s)
+  => Wire s e m a (Either (Wire s e m a b) b)
+  -> Wire s e m a b
+switch w = Wire.mkGen $ \s a -> do
+  (Right eb, w') <- Wire.stepWire w s (Right a)
+  case eb of
+    Left  we -> Wire.stepWire we mempty (Right a)
+    Right b  -> return (Right b, switch w')
+
+followedBy :: (Monad m, Monoid s, Applicative t)
+  => Wire s e m a (Maybe b)
+  -> Wire s e m a (t b)
+  -> Wire s e m a (Either (Wire s e m a (t b)) (t b))
+w1 `followedBy` w2 = w1 >>> arr f
+  where
+    f (Just b) = Right $ pure b
+    f Nothing  = Left w2
+
+choose :: (Monad m, Monoid s, Applicative t)
+  => Wire s e m a (Either k b)
+  -> (k -> Wire s e m a (t b))
+  -> Wire s e m a (Either (Wire s e m a (t b)) (t b))
+w1 `choose` g = w1 >>> arr f
+  where
+    f (Right b) = Right $ pure b
+    f (Left  k) = Left  $ g k
 
 data Ball = Ball
   { _ballPos :: V2 Float
@@ -125,7 +151,12 @@ makeLenses ''GameState
 
 
 mainWire :: a ->> Maybe Gloss.Picture
-mainWire = exitOnEsc ?>>>? (gameLogic ?>>> gameDisplay) --> mainWire
+mainWire = exitOnEsc ?>>>? countdown'
+  where
+    countdown' :: a ->> Maybe Gloss.Picture
+    countdown' = switch $ (countdownLogic ??>>> countdownDisplay) `choose` game'
+    game' :: GameState -> a ->> Maybe Gloss.Picture
+    game' k = switch $ (gameLogic k ?>>> gameDisplay) `followedBy` countdown'
 
 gameDisplay :: GameState ->> Gloss.Picture
 gameDisplay = proc gs -> do
@@ -145,10 +176,26 @@ brickPic (Circle (V2 x y) r) =
 brickPic (Rectangle (V2 x y) w h) =
   Gloss.translate x y $ rectangleFilled brickColor w h
 
-gameLogic :: a ->> Maybe GameState
-gameLogic = proc _ -> do
+countdownLogic :: a ->> Either GameState (GameState, Float)
+countdownLogic = proc _ -> do
+  t <- Wire.time -< ()
+  rec state <- moveBat <<< delayM stateInit -< state
+  let remaining = countdownTime - t
+  returnA -<
+    if remaining <= 0
+    then Left state
+    else Right (state, remaining)
+
+countdownDisplay :: (GameState, Float) ->> Gloss.Picture
+countdownDisplay = proc (gs, remaining) -> do
+  pic <- gameDisplay -< gs
+  let text = show (ceiling remaining :: Int)
+  returnA -< pic <> (Gloss.color Gloss.chartreuse . Gloss.text $ text)
+
+gameLogic :: GameState -> a ->> Maybe GameState
+gameLogic initGs = proc _ -> do
   rec
-    state' <- update . delayM stateInit -< state
+    state' <- update <<< Wire.delay initGs -< state
     let state = fromJust state'
   returnA -< state'
   where
@@ -160,10 +207,11 @@ gameLogic = proc _ -> do
            <+> collideBallBat
            <+> overI gsBall ballAlive
     moveBall (Ball pos vel) = Ball (pos + vel) vel
-    moveBat :: GameState ->> GameState
-    moveBat = proc gs -> do
-      x <- constM . view $ envMouse . _x -< ()
-      returnA -< set gsBatX x gs
+
+moveBat :: GameState ->> GameState
+moveBat = proc gs -> do
+  x <- constM . view $ envMouse . _x -< ()
+  returnA -< set gsBatX x gs
 
 exitOnEsc :: a ->> Maybe a
 exitOnEsc = proc a -> do
@@ -416,3 +464,6 @@ batColor = Gloss.makeColorI 0x5e 0x85 0x9a 0xff
 
 brickColor :: Gloss.Color
 brickColor = Gloss.makeColorI 0xaa 0x52 0x39 0xff
+
+countdownTime :: Float
+countdownTime = 3
