@@ -67,41 +67,28 @@ overI l w = proc a -> do
   ms <- w -< view l a
   returnA -< fmap (\s -> set l s a) ms
 
-infixr 9 .?
-(.?) :: ArrowChoice p => p b c -> p a (Maybe b) -> p a (Maybe c)
-p1 .? p2 = proc a -> do
-  mb <- p2 -< a
-  case mb of
-    Just b  -> Just ^<< p1 -< b
-    Nothing -> returnA -< Nothing
+class WireTag t where
+  infixr 1 =>>>=
+  (=>>>=) :: ArrowChoice p => p a (t b) -> p b (t c) -> p a (t c)
 
-infixr 9 ?.?
-(?.?) :: ArrowChoice p => p b (Maybe c) -> p a (Maybe b) -> p a (Maybe c)
-p1 ?.? p2 = proc a -> do
-  mb <- p2 -< a
-  case mb of
-    Just b  -> p1 -< b
-    Nothing -> returnA -< Nothing
+instance WireTag Maybe where
+  p1 =>>>= p2 = proc a -> do
+    mb <- p1 -< a
+    case mb of
+      Just b  -> p2 -< b
+      Nothing -> returnA -< Nothing
 
-infixr 1 ?>>>
-(?>>>) :: ArrowChoice p => p a (Maybe b) -> p b c -> p a (Maybe c)
-(?>>>) = flip (.?)
+instance WireTag (Either e) where
+  p1 =>>>= p2 = proc a -> do
+    eb <- p1 -< a
+    case eb of
+      Right b -> p2 -< b
+      Left  e -> returnA -< Left e
 
-infixr 1 ??>>>
-(??>>>) :: ArrowChoice p => p a (Either e b) -> p b c -> p a (Either e c)
-p1 ??>>> p2 = proc a -> do
-  eb <- p1 -< a
-  case eb of
-    Left  e -> returnA -< Left e
-    Right b -> Right ^<< p2 -< b
-
-infixr 1 ?>>>?
-(?>>>?) :: ArrowChoice p => p a (Maybe b) -> p b (Maybe c) -> p a (Maybe c)
-(?>>>?) = flip (?.?)
-
-infixr 1 ^>>?
-(^>>?) :: Arrow p => (a -> b) -> p b (Maybe c) -> p a (Maybe c)
-f ^>>? p = arr f >>> p
+infixr 1 =>>>
+(=>>>) :: (Applicative t, WireTag t, ArrowChoice p)
+  => p a (t b) -> p b c -> p a (t c)
+p1 =>>> p2 = p1 =>>>= (p2 >>^ pure)
 
 switch :: (Monad m, Monoid s)
   => Wire s e m a (Either (Wire s e m a b) b)
@@ -151,12 +138,12 @@ makeLenses ''GameState
 
 
 mainWire :: a ->> Maybe Gloss.Picture
-mainWire = exitOnEsc ?>>>? countdown'
+mainWire = exitOnEsc =>>>= countdown'
   where
     countdown' :: a ->> Maybe Gloss.Picture
-    countdown' = switch $ (countdownLogic ??>>> countdownDisplay) `choose` game'
+    countdown' = switch $ (countdownLogic =>>> countdownDisplay) `choose` game'
     game' :: GameState -> a ->> Maybe Gloss.Picture
-    game' k = switch $ (gameLogic k ?>>> gameDisplay) `followedBy` countdown'
+    game' k = switch $ (gameLogic k =>>> gameDisplay) `followedBy` countdown'
 
 gameDisplay :: GameState ->> Gloss.Picture
 gameDisplay = proc gs -> do
