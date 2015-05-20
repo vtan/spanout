@@ -12,7 +12,7 @@ import Control.Arrow hiding ((<+>))
 import Control.Category
 import Control.Lens
 import Control.Monad (guard, liftM, replicateM)
-import Control.Monad.Random (MonadRandom, Rand, StdGen, evalRandIO, getRandomR)
+import Control.Monad.Random
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Wire (Wire)
 import qualified Control.Wire as Wire
@@ -110,11 +110,9 @@ data Ball = Ball
   }
 makeLenses ''Ball
 
-data Brick = Brick
-  { _brickCenter :: V2 Float
-  , _brickRadius :: Float
-  }
-makeLenses ''Brick
+data Brick
+  = Circle (V2 Float) Float
+  | Rectangle (V2 Float) Float Float
 
 data GameState = GameState
   { _gsBall          :: Ball
@@ -137,10 +135,15 @@ gameDisplay = proc gs -> do
     ballPic = Gloss.translate px py $ circleFilled ballColor ballRadius
     batPic = Gloss.translate mouseX batPositionY
            $ rectangleFilled batColor batWidth batHeight
-    brickPics = [ Gloss.translate x y $ circleFilled brickColor r
-                | Brick (V2 x y) r <- view gsBricks gs]
+    brickPics = map brickPic $ view gsBricks gs
     lastCollPic = displayLastColl $ view gsLastCollision gs
   returnA -< Gloss.pictures $ brickPics ++ [ballPic, batPic, lastCollPic]
+
+brickPic :: Brick -> Gloss.Picture
+brickPic (Circle (V2 x y) r) =
+  Gloss.translate x y $ circleFilled brickColor r
+brickPic (Rectangle (V2 x y) w h) =
+  Gloss.translate x y $ rectangleFilled brickColor w h
 
 gameLogic :: a ->> Maybe GameState
 gameLogic = proc _ -> do
@@ -254,11 +257,27 @@ ballBatNormal batX (V2 px py)
     by  = py <= batPositionY + batHeight / 2 + ballRadius
 
 ballBrickNormal :: Brick -> Ball -> Maybe (V2 Float)
-ballBrickNormal (Brick pos radius) ball
-  | hit       = Just . normalize $ (view ballPos ball) - pos
+ballBrickNormal (Circle pos radius) ball
+  | hit = Just . normalize $ (view ballPos ball) - pos
   | otherwise = Nothing
   where
     hit = distance (view ballPos ball) pos <= radius + ballRadius
+ballBrickNormal (Rectangle pos@(V2 x y) width height) ball
+  | tooFar = Nothing
+  | hitX = Just $ signum (ballY - y) *^ unit _y
+  | hitY = Just $ signum (ballX - x) *^ unit _x
+  | hitCorner = Just . normalize $ signum <$> dist
+  | otherwise = Nothing
+  where
+    dist = view ballPos ball - pos
+    V2 distAbsX distAbsY = abs <$> dist
+    V2 ballX ballY = view ballPos ball
+    tooFar = distAbsX > width / 2 + ballRadius
+          || distAbsY > height / 2 + ballRadius
+    hitX = distAbsX <= width / 2
+    hitY = distAbsY <= height / 2
+    hitCorner = quadrance (V2 (distAbsX - width / 2) (distAbsY - height / 2))
+             <= ballRadius ^ (2 :: Int)
 
 batNormal :: Float -> Float -> V2 Float
 batNormal x batX = perp . angle $ batSpread * relX
@@ -370,13 +389,17 @@ batSpread = pi / 12
 
 stateInit :: MonadRandom m => m GameState
 stateInit = do
-  bricks <- replicateM 10 $ do
+  shapeRatio <- getRandom
+  bricks <- replicateM 20 $ do
     x <- getRandomR (screenLeftBound, screenRightBound)
     y <- getRandomR (screenLowerBound, screenUpperBound)
-    r <- getRandomR (10, 50)
-    return $ Brick (V2 x y) r
+    let pos = V2 x y
+    which <- getRandom
+    if (which :: Double) < (shapeRatio :: Double)
+    then Circle <$> pure pos <*> getRandomR (10, 50)
+    else Rectangle <$> pure pos <*> getRandomR (50, 100) <*> getRandomR (10, 50)
   return $ GameState
-    { _gsBall = Ball (V2 0 0) (V2 0 (-5))
+    { _gsBall = Ball (V2 0 0) (V2 0 (-6))
     , _gsBatX = 0
     , _gsBricks = bricks
     , _gsLastCollision = Nothing
