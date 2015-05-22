@@ -1,25 +1,10 @@
 {-# LANGUAGE Arrows #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Spanout.Gameplay
-  ( Ball(..)
-  , ballPos
-  , ballVel
-  , GameState(..)
-  , gsBall
-  , gsBatX
-  , gsBricks
-  , gsLastCollision
+  ( gameLogic
   , countdownLogic
-  , gameLogic
-  , moveBat
   , exitOnEsc
-  , ballAlive
-  , collideBallEdge
-  , collideBallBat
-  , collideBallBrick
-  , stateInit
   ) where
 
 import Spanout.Common
@@ -43,30 +28,6 @@ import Linear
 
 
 
-data Ball = Ball
-  { _ballPos :: V2 Float
-  , _ballVel :: V2 Float
-  }
-makeLenses ''Ball
-
-data GameState = GameState
-  { _gsBall          :: Ball
-  , _gsBatX          :: Float
-  , _gsBricks        :: [Brick]
-  , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
-  }
-makeLenses ''GameState
-
-countdownLogic :: a ->> Either GameState (GameState, Float)
-countdownLogic = proc _ -> do
-  t <- Wire.time -< ()
-  rec state <- moveBat <<< Wire.delayM stateInit -< state
-  let remaining = countdownTime - t
-  returnA -<
-    if remaining <= 0
-    then Left state
-    else Right (state, remaining)
-
 gameLogic :: GameState -> a ->> Maybe GameState
 gameLogic initGs = proc _ -> do
   rec
@@ -83,10 +44,15 @@ gameLogic initGs = proc _ -> do
            <+> Wire.overI gsBall ballAlive
     moveBall (Ball pos vel) = Ball (pos + vel) vel
 
-moveBat :: GameState ->> GameState
-moveBat = proc gs -> do
-  x <- Wire.constM . view $ envMouse . _x -< ()
-  returnA -< set gsBatX x gs
+countdownLogic :: a ->> Either GameState (GameState, Float)
+countdownLogic = proc _ -> do
+  t <- Wire.time -< ()
+  rec state <- moveBat <<< Wire.delayM stateInit -< state
+  let remaining = countdownTime - t
+  returnA -<
+    if remaining <= 0
+    then Left state
+    else Right (state, remaining)
 
 exitOnEsc :: a ->> Maybe a
 exitOnEsc = proc a -> do
@@ -97,6 +63,13 @@ exitOnEsc = proc a -> do
       else Nothing
   where
     esc = Gloss.SpecialKey Gloss.KeyEsc
+
+
+
+moveBat :: GameState ->> GameState
+moveBat = proc gs -> do
+  x <- Wire.constM . view $ envMouse . _x -< ()
+  returnA -< set gsBatX x gs
 
 ballAlive :: Ball ->> Maybe Ball
 ballAlive = arr $ \ball ->
@@ -208,7 +181,7 @@ batNormal x batX = perp . angle $ batSpread * relX
 reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
-stateInit :: (MonadRandom m, Applicative m) => m GameState
+stateInit :: MonadRandom m => m GameState
 stateInit = do
   bricks <- generateBricks
   return GameState

@@ -19,6 +19,8 @@ generateBricks = do
     h = relH * fromIntegral screenHeight
   return $ generateBricksInRect w h
 
+
+
 generateBricksInRect :: Float -> Float -> [Brick]
 generateBricksInRect w h =
   map rectBrick [(x, y) | x <- [0 .. countX - 1], y <- [0 .. countY - 1]]

@@ -2,12 +2,22 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Spanout.Common
-  ( M
-  , type (->>)
+  ( Ball(..)
+  , ballPos
+  , ballVel
   , Brick(..)
+  , GameState(..)
+  , gsBall
+  , gsBatX
+  , gsBricks
+  , gsLastCollision
+
   , Env(..)
   , envMouse
   , envKeys
+  , M
+  , type (->>)
+
   , screenWidth
   , screenHeight
   , screenRightBound
@@ -40,19 +50,34 @@ import Linear
 
 
 
-type M = ReaderT Env (Rand StdGen)
-
-type a ->> b = Wire (Wire.Timed Float ()) () M a b
+data Ball = Ball
+  { _ballPos :: V2 Float
+  , _ballVel :: V2 Float
+  }
+makeLenses ''Ball
 
 data Brick
   = Circle (V2 Float) Float
   | Rectangle (V2 Float) Float Float
+
+data GameState = GameState
+  { _gsBall          :: Ball
+  , _gsBatX          :: Float
+  , _gsBricks        :: [Brick]
+  , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
+  }
+makeLenses ''GameState
 
 data Env = Env
   { _envMouse :: V2 Float
   , _envKeys  :: Set Gloss.Key
   }
 makeLenses ''Env
+
+type M = ReaderT Env (Rand StdGen)
+
+type a ->> b = Wire (Wire.Timed Float ()) () M a b
+
 
 screenWidth :: Int
 screenWidth = 960

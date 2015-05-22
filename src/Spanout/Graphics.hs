@@ -6,7 +6,6 @@ module Spanout.Graphics
   ) where
 
 import Spanout.Common
-import Spanout.Gameplay
 
 import Control.Arrow
 import Control.Lens
@@ -24,6 +23,8 @@ gameDisplay = arr gamePic
 
 countdownDisplay :: (GameState, Float) ->> Gloss.Picture
 countdownDisplay = arr $ uncurry countdownPic
+
+
 
 gamePic :: GameState -> Gloss.Picture
 gamePic gs = Gloss.pictures $

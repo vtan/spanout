@@ -26,7 +26,7 @@ import Control.Arrow hiding ((<+>))
 import Control.Lens
 import Control.Monad (liftM)
 import Control.Wire (Wire)
-import qualified Control.Wire as Wire hiding (switch)
+import qualified Control.Wire as Wire
 
 import Data.Maybe (fromMaybe)
 import Data.Monoid
