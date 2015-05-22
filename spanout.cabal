@@ -8,13 +8,21 @@ build-type: Simple
 cabal-version: >=1.10
 
 executable spanout
+  hs-source-dirs: src
+  main-is: Spanout/Main.hs
+  other-modules:
+    Spanout.Wire, Spanout.Common, Spanout.Gameplay, Spanout.Graphics
   ghc-options:
     -main-is Spanout.Main.main -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
-  main-is: Spanout/Main.hs
-  other-extensions: Arrows, RankNTypes, TemplateHaskell, TypeOperators
+  other-extensions:
+    TypeOperators, Arrows, RankNTypes, TemplateHaskell
   build-depends:
-    base >=4.6 && <4.7, lens >=4.9 && <4.10, MonadRandom >=0.4 && <0.5,
-    mtl >=2.2 && <2.3, containers >=0.5 && <0.6, gloss >=1.8 && <1.9,
-    linear >=1.18 && <1.19, netwire >=5.0 && <5.1
-  hs-source-dirs: src
+    base >=4.6 && <5,
+    mtl >=2.2 && <2.3,
+    containers >=0.5 && <0.6,
+    lens >=4.9 && <4.10,
+    linear >=1.18 && <1.19,
+    MonadRandom >=0.4 && <0.5,
+    netwire >=5.0 && <5.1,
+    gloss >=1.8 && <1.9
   default-language: Haskell2010
