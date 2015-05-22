@@ -2,11 +2,12 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Spanout.Common
-  ( Env(..)
+  ( M
+  , type (->>)
+  , Brick(..)
+  , Env(..)
   , envMouse
   , envKeys
-  , M
-  , type (->>)
   , screenWidth
   , screenHeight
   , screenRightBound
@@ -39,15 +40,19 @@ import Linear
 
 
 
+type M = ReaderT Env (Rand StdGen)
+
+type a ->> b = Wire (Wire.Timed Float ()) () M a b
+
+data Brick
+  = Circle (V2 Float) Float
+  | Rectangle (V2 Float) Float Float
+
 data Env = Env
   { _envMouse :: V2 Float
   , _envKeys  :: Set Gloss.Key
   }
 makeLenses ''Env
-
-type M = ReaderT Env (Rand StdGen)
-
-type a ->> b = Wire (Wire.Timed Float ()) () M a b
 
 screenWidth :: Int
 screenWidth = 960

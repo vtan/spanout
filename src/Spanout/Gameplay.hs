@@ -6,7 +6,6 @@ module Spanout.Gameplay
   ( Ball(..)
   , ballPos
   , ballVel
-  , Brick(..)
   , GameState(..)
   , gsBall
   , gsBatX
@@ -24,6 +23,7 @@ module Spanout.Gameplay
   ) where
 
 import Spanout.Common
+import Spanout.Level
 import Spanout.Wire ((<+>))
 import qualified Spanout.Wire as Wire
 
@@ -48,10 +48,6 @@ data Ball = Ball
   , _ballVel :: V2 Float
   }
 makeLenses ''Ball
-
-data Brick
-  = Circle (V2 Float) Float
-  | Rectangle (V2 Float) Float Float
 
 data GameState = GameState
   { _gsBall          :: Ball
@@ -214,17 +210,9 @@ reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
 stateInit :: (MonadRandom m, Applicative m) => m GameState
 stateInit = do
-  shapeRatio <- getRandom
-  bricks <- replicateM 20 $ do
-    x <- getRandomR (screenLeftBound, screenRightBound)
-    y <- getRandomR (screenLowerBound, screenUpperBound)
-    let pos = V2 x y
-    which <- getRandom
-    if (which :: Double) < (shapeRatio :: Double)
-    then Circle <$> pure pos <*> getRandomR (10, 50)
-    else Rectangle <$> pure pos <*> getRandomR (50, 100) <*> getRandomR (10, 50)
+  bricks <- generateBricks
   return GameState
-    { _gsBall = Ball (V2 0 0) (V2 0 (-6))
+    { _gsBall = Ball (V2 0 (screenLowerBound + 4 * batHeight)) (V2 0 (-6))
     , _gsBatX = 0
     , _gsBricks = bricks
     , _gsLastCollision = Nothing

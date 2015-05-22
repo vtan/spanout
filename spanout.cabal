@@ -1,5 +1,5 @@
 name: spanout
-version: 0.1.0.0
+version: 0.1
 synopsis: A breakout clone written in netwire and gloss
 author: Viktor Tanyi
 maintainer: tanyi.viktor@gmail.com
@@ -11,7 +11,8 @@ executable spanout
   hs-source-dirs: src
   main-is: Spanout/Main.hs
   other-modules:
-    Spanout.Wire, Spanout.Common, Spanout.Gameplay, Spanout.Graphics
+    Spanout.Common, Spanout.Gameplay, Spanout.Graphics, Spanout.Level,
+    Spanout.Wire
   ghc-options:
     -main-is Spanout.Main.main -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
   other-extensions:
