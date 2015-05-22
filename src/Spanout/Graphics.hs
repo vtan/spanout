@@ -1,4 +1,3 @@
-{-# LANGUAGE Arrows #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Spanout.Graphics
@@ -8,7 +7,6 @@ module Spanout.Graphics
 
 import Spanout.Common
 import Spanout.Gameplay
-import qualified Spanout.Wire as Wire
 
 import Control.Arrow
 import Control.Lens
@@ -22,16 +20,32 @@ import Linear
 
 
 gameDisplay :: GameState ->> Gloss.Picture
-gameDisplay = proc gs -> do
-  mouseX <- Wire.constM . view $ envMouse . _x -< ()
-  let
-    V2 px py = view (gsBall . ballPos) gs
-    ballPic = Gloss.translate px py $ circleFilled ballColor ballRadius
-    batPic = Gloss.translate mouseX batPositionY
-           $ rectangleFilled batColor batWidth batHeight
-    brickPics = map brickPic $ view gsBricks gs
-    lastCollPic = displayLastColl $ view gsLastCollision gs
-  returnA -< Gloss.pictures $ brickPics ++ [ballPic, batPic, lastCollPic]
+gameDisplay = arr gamePic
+
+countdownDisplay :: (GameState, Float) ->> Gloss.Picture
+countdownDisplay = arr $ uncurry countdownPic
+
+gamePic :: GameState -> Gloss.Picture
+gamePic gs = Gloss.pictures $
+     map brickPic (view gsBricks gs)
+  ++ [ ballPic     $ view (gsBall . ballPos) gs
+     , batPic      $ view gsBatX gs
+     , lastCollPic $ view gsLastCollision gs
+     ]
+
+countdownPic :: GameState -> Float -> Gloss.Picture
+countdownPic gs remaining = gamePic gs <> remainingText
+  where
+    remainingText = Gloss.color Gloss.chartreuse $ Gloss.text str
+    str = show (ceiling remaining :: Int)
+
+ballPic :: V2 Float -> Gloss.Picture
+ballPic (V2 x y) =
+  Gloss.translate x y $ circleFilled ballColor ballRadius
+
+batPic :: Float -> Gloss.Picture
+batPic x =
+  Gloss.translate x batPositionY $ rectangleFilled batColor batWidth batHeight
 
 brickPic :: Brick -> Gloss.Picture
 brickPic (Circle (V2 x y) r) =
@@ -39,27 +53,9 @@ brickPic (Circle (V2 x y) r) =
 brickPic (Rectangle (V2 x y) w h) =
   Gloss.translate x y $ rectangleFilled brickColor w h
 
-
-countdownDisplay :: (GameState, Float) ->> Gloss.Picture
-countdownDisplay = proc (gs, remaining) -> do
-  pic <- gameDisplay -< gs
-  let text = show (ceiling remaining :: Int)
-  returnA -< pic <> (Gloss.color Gloss.chartreuse . Gloss.text $ text)
-
-
-circleFilled :: Gloss.Color -> Float -> Gloss.Picture
-circleFilled color radius =
-     Gloss.color color (Gloss.circleSolid radius)
-  <> Gloss.color (Gloss.dark color) (Gloss.circle radius)
-
-rectangleFilled :: Gloss.Color -> Float -> Float -> Gloss.Picture
-rectangleFilled color width height =
-     Gloss.color color (Gloss.rectangleSolid width height)
-  <> Gloss.color (Gloss.dark color) (Gloss.rectangleWire width height)
-
-displayLastColl ::
+lastCollPic ::
   Maybe (V2 Float, V2 Float, V2 Float, V2 Float) -> Gloss.Picture
-displayLastColl = maybe Gloss.blank pics
+lastCollPic = maybe Gloss.blank pics
   where
     pics (pos, before, normal, after) =
       let
@@ -71,3 +67,13 @@ displayLastColl = maybe Gloss.blank pics
           [Gloss.aquamarine, Gloss.chartreuse, Gloss.orange]
           (map (uncurry line) [before', normal', after'])
     line (V2 ux uy) (V2 vx vy) = Gloss.line [(ux, uy), (vx, vy)]
+
+circleFilled :: Gloss.Color -> Float -> Gloss.Picture
+circleFilled color radius =
+     Gloss.color color (Gloss.circleSolid radius)
+  <> Gloss.color (Gloss.dark color) (Gloss.circle radius)
+
+rectangleFilled :: Gloss.Color -> Float -> Float -> Gloss.Picture
+rectangleFilled color width height =
+     Gloss.color color (Gloss.rectangleSolid width height)
+  <> Gloss.color (Gloss.dark color) (Gloss.rectangleWire width height)
