@@ -20,8 +20,13 @@ generateBricks = do
   let rowHeights = map (scrHeight *) relRowHeights
   rows <- forM rowHeights $ \h -> do
     relW <- getRandomR (0.3, 0.9)
-    let w = scrWidth * relW
-    return $ fillBricks w h
+    shape <- getRandom
+    let
+      w = scrWidth * relW
+      gen
+        | shape < (0.5 :: Float) = fillCircles
+        | otherwise              = fillRectangles
+    return $ gen w h
   relLevelOffsetY <- getRandomR (0.05, (1 - relLevelHeight) - 0.05)
   let
     levelHeight = scrHeight * relLevelHeight
@@ -50,17 +55,29 @@ splitRow h
         (++) <$> splitRow (ratio * h) <*> splitRow ((1 - ratio) * h)
       else return [h]
 
-fillBricks :: Float -> Float -> [Brick]
-fillBricks w h =
-  map rectBrick [(x, y) | x <- [0 .. countX - 1], y <- [0 .. countY - 1]]
+fillCircles :: Float -> Float -> [Brick]
+fillCircles w h
+  | h >= brickHeight = map circBrick [0 .. countX - 1]
+  | otherwise        = []
+  where
+    r = h / 2
+    (countX, marginX) = w `divMod'` h
+    startX = negate $ (w - marginX - h) / 2
+    y = -h / 2
+    circBrick :: Int -> Brick
+    circBrick x = Brick (V2 (startX + fromIntegral x * h) y) $ Circle r
+
+fillRectangles :: Float -> Float -> [Brick]
+fillRectangles w h =
+  map rectBrick [V2 x y | x <- [0 .. countX - 1], y <- [0 .. countY - 1]]
   where
     (countX, marginX) = w `divMod'` brickWidth
     (countY, marginY) = h `divMod'` brickHeight
-    startX = negate $ (w - marginX) / 2
-    startY = negate $ (h - marginY) / 2
+    startX = negate $ (w - marginX - brickWidth) / 2
+    startY = negate $ (h - marginY - brickHeight) / 2
 
-    rectBrick :: (Int, Int) -> Brick
-    rectBrick (x, y) = Brick (V2 px py) $ Rectangle brickWidth brickHeight
+    rectBrick :: V2 Int -> Brick
+    rectBrick (V2 x y) = Brick (V2 px py) $ Rectangle brickWidth brickHeight
       where
         px = startX + fromIntegral x * brickWidth
         py = startY + fromIntegral y * brickHeight
