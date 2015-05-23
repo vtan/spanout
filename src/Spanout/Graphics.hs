@@ -49,9 +49,9 @@ batPic x =
   Gloss.translate x batPositionY $ rectangleFilled batColor batWidth batHeight
 
 brickPic :: Brick -> Gloss.Picture
-brickPic (Circle (V2 x y) r) =
+brickPic (Brick (V2 x y) (Circle r)) =
   Gloss.translate x y $ circleFilled brickColor r
-brickPic (Rectangle (V2 x y) w h) =
+brickPic (Brick (V2 x y) (Rectangle w h)) =
   Gloss.translate x y $ rectangleFilled brickColor w h
 
 lastCollPic ::

@@ -151,12 +151,12 @@ ballBatNormal batX (V2 px py)
     by  = py <= batPositionY + batHeight / 2 + ballRadius
 
 ballBrickNormal :: Brick -> Ball -> Maybe (V2 Float)
-ballBrickNormal (Circle pos radius) ball
+ballBrickNormal (Brick pos (Circle radius)) ball
   | hit = Just . normalize $ view ballPos ball - pos
   | otherwise = Nothing
   where
     hit = distance (view ballPos ball) pos <= radius + ballRadius
-ballBrickNormal (Rectangle pos@(V2 x y) width height) ball
+ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) ball
   | tooFar = Nothing
   | hitX = Just $ signum (ballY - y) *^ unit _y
   | hitY = Just $ signum (ballX - x) *^ unit _x
@@ -181,7 +181,7 @@ batNormal x batX = perp . angle $ batSpread * relX
 reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
-stateInit :: MonadRandom m => m GameState
+stateInit :: (MonadRandom m, Applicative m) => m GameState
 stateInit = do
   bricks <- generateBricks
   return GameState

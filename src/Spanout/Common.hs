@@ -5,7 +5,10 @@ module Spanout.Common
   ( Ball(..)
   , ballPos
   , ballVel
+  , BrickGeom(..)
   , Brick(..)
+  , brPos
+  , brGeom
   , GameState(..)
   , gsBall
   , gsBatX
@@ -56,9 +59,15 @@ data Ball = Ball
   }
 makeLenses ''Ball
 
-data Brick
-  = Circle (V2 Float) Float
-  | Rectangle (V2 Float) Float Float
+data BrickGeom
+  = Circle Float
+  | Rectangle Float Float
+
+data Brick = Brick
+  { _brPos :: V2 Float
+  , _brGeom :: BrickGeom
+  }
+makeLenses ''Brick
 
 data GameState = GameState
   { _gsBall          :: Ball
