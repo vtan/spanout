@@ -29,9 +29,10 @@ countdownDisplay = arr $ uncurry countdownPic
 gamePic :: GameState -> Gloss.Picture
 gamePic gs = Gloss.pictures $
      map brickPic (view gsBricks gs)
-  ++ [ ballPic     $ view (gsBall . ballPos) gs
-     , batPic      $ view gsBatX gs
-     , lastCollPic $ view gsLastCollision gs
+  ++ [ ballPic      $ view (gsBall . ballPos) gs
+     , batPic       $ view gsBatX gs
+     , lastCollPic  $ view gsLastCollision gs
+     , brickRowsPic $ view gsBrickRows gs
      ]
 
 countdownPic :: GameState -> Float -> Gloss.Picture
@@ -68,6 +69,12 @@ lastCollPic = maybe Gloss.blank pics
           [Gloss.aquamarine, Gloss.chartreuse, Gloss.orange]
           (map (uncurry line) [before', normal', after'])
     line (V2 ux uy) (V2 vx vy) = Gloss.line [(ux, uy), (vx, vy)]
+
+brickRowsPic :: [Float] -> Gloss.Picture
+brickRowsPic rows = Gloss.color col . Gloss.pictures $ map rowPic rows
+  where
+    rowPic y = Gloss.line [(screenLeftBound, y), (screenRightBound, y)]
+    col = Gloss.light bgColor
 
 circleFilled :: Gloss.Color -> Float -> Gloss.Picture
 circleFilled color radius =

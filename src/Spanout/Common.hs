@@ -14,6 +14,7 @@ module Spanout.Common
   , gsBatX
   , gsBricks
   , gsLastCollision
+  , gsBrickRows
 
   , Env(..)
   , envMouse
@@ -74,6 +75,7 @@ data GameState = GameState
   , _gsBatX          :: Float
   , _gsBricks        :: [Brick]
   , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
+  , _gsBrickRows     :: [Float]
   }
 makeLenses ''GameState
 

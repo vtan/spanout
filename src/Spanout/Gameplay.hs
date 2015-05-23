@@ -183,10 +183,11 @@ reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
 
 stateInit :: (MonadRandom m, Applicative m) => m GameState
 stateInit = do
-  bricks <- generateBricks
+  (bricks, brickRows) <- generateBricks
   return GameState
     { _gsBall = Ball (V2 0 (screenLowerBound + 4 * batHeight)) (V2 0 (-6))
     , _gsBatX = 0
     , _gsBricks = bricks
+    , _gsBrickRows = brickRows
     , _gsLastCollision = Nothing
     }
