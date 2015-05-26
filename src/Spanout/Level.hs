@@ -1,4 +1,8 @@
-module Spanout.Level (generateBricks) where
+module Spanout.Level
+  ( generateBricks
+
+  , test
+  ) where
 
 import Spanout.Common
 
@@ -8,8 +12,12 @@ import Control.Monad
 import Control.Monad.Random
 
 import Data.Fixed (divMod')
+import Data.List (sort)
 
 import Linear
+
+import qualified Test.Framework as Test
+import qualified Test.Framework.Providers.QuickCheck2 as Test
 
 
 
@@ -27,20 +35,19 @@ generateBricks = do
         | shape < (0.5 :: Float) = fillCircles
         | otherwise              = fillRectangles
     return $ gen w h
-  relLevelOffsetY <- getRandomR (0.05, (1 - relLevelHeight) - 0.05)
+  relLevelOffsetY <- pure 0 --getRandomR (0.05, (1 - relLevelHeight) - 0.05)
   let
     levelHeight = scrHeight * relLevelHeight
     offsetY = -(relLevelOffsetY / 2) * levelHeight
-    cumulativeHeights = scanl (+) 0 rowHeights
-    rowYs = zipWith avg (init cumulativeHeights) (tail cumulativeHeights)
-    centeredRowYs = map (offsetY +) rowYs
-    placedRows = zipWith placeRow centeredRowYs rows
-  return (concat placedRows, LevelGeom levelHeight offsetY centeredRowYs)
+    rowBottoms = map (subtract levelHeight) $ scanl (+) 0 rowHeights
+    rowYs = alignRows rowHeights
+    placedRows = zipWith placeRow rowYs rows
+  return (concat placedRows, LevelGeom levelHeight offsetY rowYs)
   where
     placeRow y = over (mapped . brPos . _y) (+y)
     scrWidth = fromIntegral screenWidth
     scrHeight = fromIntegral screenHeight
-    avg x y = (x + y) / 2
+    avg a b = (a + b) / 2
 
 
 
@@ -55,6 +62,7 @@ splitRow h
         (++) <$> splitRow (ratio * h) <*> splitRow ((1 - ratio) * h)
       else return [h]
 
+-- Fills the rectangle centered at the origin with bricks.
 fillCircles :: Float -> Float -> [Brick]
 fillCircles w h
   | h >= brickHeight = map circBrick [0 .. countX - 1]
@@ -63,10 +71,11 @@ fillCircles w h
     r = h / 2
     (countX, marginX) = w `divMod'` h
     startX = negate $ (w - marginX - h) / 2
-    y = -h / 2
+    y = 0
     circBrick :: Int -> Brick
     circBrick x = Brick (V2 (startX + fromIntegral x * h) y) $ Circle r
 
+-- Fills the rectangle centered at the origin with bricks.
 fillRectangles :: Float -> Float -> [Brick]
 fillRectangles w h =
   map rectBrick [V2 x y | x <- [0 .. countX - 1], y <- [0 .. countY - 1]]
@@ -82,8 +91,25 @@ fillRectangles w h =
         px = startX + fromIntegral x * brickWidth
         py = startY + fromIntegral y * brickHeight
 
+alignRows :: [Float] -> [Float]
+alignRows heights = heights
+
 brickWidth :: Float
 brickWidth = 80
 
 brickHeight :: Float
 brickHeight = 30
+
+
+
+test :: Test.Test
+test = Test.testGroup "Spanout.Level"
+  [ Test.testProperty
+      "alignRows results are ascending"
+      alignRows_resultAscending
+  ]
+
+alignRows_resultAscending :: [Float] -> Bool
+alignRows_resultAscending heights = centers == sort centers
+  where
+    centers = alignRows heights

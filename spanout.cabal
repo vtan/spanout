@@ -9,12 +9,12 @@ cabal-version: >=1.10
 
 executable spanout
   hs-source-dirs: src
-  main-is: Spanout/Main.hs
+  main-is: Main.hs
   other-modules:
     Spanout.Common, Spanout.Gameplay, Spanout.Graphics, Spanout.Level,
     Spanout.Wire
   ghc-options:
-    -main-is Spanout.Main.main -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
+    -O2 -threaded -rtsopts -with-rtsopts=-N
   other-extensions:
     TypeOperators, Arrows, RankNTypes, TemplateHaskell
   build-depends:
@@ -25,5 +25,24 @@ executable spanout
     linear >=1.18 && <1.19,
     MonadRandom >=0.4 && <0.5,
     netwire >=5.0 && <5.1,
-    gloss >=1.8 && <1.9
+    gloss >=1.8 && <1.9,
+    test-framework >=0.7.1,
+    test-framework-quickcheck2
+  default-language: Haskell2010
+
+test-suite tests-spanout
+  type: exitcode-stdio-1.0
+  hs-source-dirs: src
+  main-is: Tests.hs
+  build-depends:
+    base >=4.6 && <5,
+    mtl >=2.2 && <2.3,
+    containers >=0.5 && <0.6,
+    lens >=4.9 && <4.10,
+    linear >=1.18 && <1.19,
+    MonadRandom >=0.4 && <0.5,
+    netwire >=5.0 && <5.1,
+    gloss >=1.8 && <1.9,
+    test-framework >=0.7.1,
+    test-framework-quickcheck2
   default-language: Haskell2010
