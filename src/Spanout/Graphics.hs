@@ -32,7 +32,7 @@ gamePic gs = Gloss.pictures $
   ++ [ ballPic      $ view (gsBall . ballPos) gs
      , batPic       $ view gsBatX gs
      , lastCollPic  $ view gsLastCollision gs
-     , brickRowsPic $ view gsBrickRows gs
+     , levelGeomPic $ view gsLevelGeom gs
      ]
 
 countdownPic :: GameState -> Float -> Gloss.Picture
@@ -70,9 +70,13 @@ lastCollPic = maybe Gloss.blank pics
           (map (uncurry line) [before', normal', after'])
     line (V2 ux uy) (V2 vx vy) = Gloss.line [(ux, uy), (vx, vy)]
 
-brickRowsPic :: [Float] -> Gloss.Picture
-brickRowsPic rows = Gloss.color col . Gloss.pictures $ map rowPic rows
+levelGeomPic :: LevelGeom -> Gloss.Picture
+levelGeomPic (LevelGeom height offsetY rows) = heightPic <> rowsPic
   where
+    heightPic = Gloss.color col
+              . Gloss.translate 0 offsetY
+              $ Gloss.rectangleWire (fromIntegral screenWidth) height
+    rowsPic = Gloss.color col . Gloss.pictures $ map rowPic rows
     rowPic y = Gloss.line [(screenLeftBound, y), (screenRightBound, y)]
     col = Gloss.light bgColor
 

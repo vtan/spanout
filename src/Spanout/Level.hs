@@ -13,7 +13,7 @@ import Linear
 
 
 
-generateBricks :: (MonadRandom m, Applicative m) => m ([Brick], [Float])
+generateBricks :: (MonadRandom m, Applicative m) => m ([Brick], LevelGeom)
 generateBricks = do
   relLevelHeight <- getRandomR (0.2, 0.6)
   relRowHeights <- splitRow relLevelHeight
@@ -35,7 +35,7 @@ generateBricks = do
     rowYs = zipWith avg (init cumulativeHeights) (tail cumulativeHeights)
     centeredRowYs = map (offsetY +) rowYs
     placedRows = zipWith placeRow centeredRowYs rows
-  return (concat placedRows, centeredRowYs)
+  return (concat placedRows, LevelGeom levelHeight offsetY centeredRowYs)
   where
     placeRow y = over (mapped . brPos . _y) (+y)
     scrWidth = fromIntegral screenWidth

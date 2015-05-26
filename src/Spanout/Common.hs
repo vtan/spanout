@@ -10,7 +10,7 @@ module Spanout.Common
   , gsBatX
   , gsBricks
   , gsLastCollision
-  , gsBrickRows
+  , gsLevelGeom
   , Ball(..)
   , ballPos
   , ballVel
@@ -18,6 +18,10 @@ module Spanout.Common
   , brPos
   , brGeom
   , BrickGeom(..)
+  , LevelGeom(..)
+  , lvlgeomHeight
+  , lvlgeomOffsetY
+  , lvlgeomRowHeights
 
   , Env(..)
   , envMouse
@@ -64,7 +68,7 @@ data GameState = GameState
   , _gsBatX          :: Float
   , _gsBricks        :: [Brick]
   , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
-  , _gsBrickRows     :: [Float]
+  , _gsLevelGeom     :: LevelGeom
   }
 
 data Ball = Ball
@@ -73,13 +77,19 @@ data Ball = Ball
   }
 
 data Brick = Brick
-  { _brPos :: V2 Float
+  { _brPos  :: V2 Float
   , _brGeom :: BrickGeom
   }
 
 data BrickGeom
   = Circle Float
   | Rectangle Float Float
+
+data LevelGeom = LevelGeom
+  { _lvlgeomHeight     :: Float
+  , _lvlgeomOffsetY    :: Float
+  , _lvlgeomRowHeights :: [Float]
+  }
 
 data Env = Env
   { _envMouse :: V2 Float
@@ -89,6 +99,7 @@ data Env = Env
 makeLenses ''GameState
 makeLenses ''Ball
 makeLenses ''Brick
+makeLenses ''LevelGeom
 makeLenses ''Env
 
 screenWidth :: Int
