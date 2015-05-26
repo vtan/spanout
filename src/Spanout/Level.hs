@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns #-}
+
 module Spanout.Level
   ( generateBricks
 
@@ -7,7 +9,7 @@ module Spanout.Level
 import Spanout.Common
 
 import Control.Applicative
-import Control.Lens
+import Control.Lens (over, mapped)
 import Control.Monad
 import Control.Monad.Random
 
@@ -18,6 +20,7 @@ import Linear
 
 import qualified Test.Framework as Test
 import qualified Test.Framework.Providers.QuickCheck2 as Test
+import qualified Test.QuickCheck as Test
 
 
 
@@ -35,19 +38,15 @@ generateBricks = do
         | shape < (0.5 :: Float) = fillCircles
         | otherwise              = fillRectangles
     return $ gen w h
-  relLevelOffsetY <- pure 0 --getRandomR (0.05, (1 - relLevelHeight) - 0.05)
   let
     levelHeight = scrHeight * relLevelHeight
-    offsetY = -(relLevelOffsetY / 2) * levelHeight
-    rowBottoms = map (subtract levelHeight) $ scanl (+) 0 rowHeights
     rowYs = alignRows rowHeights
     placedRows = zipWith placeRow rowYs rows
-  return (concat placedRows, LevelGeom levelHeight offsetY rowYs)
+  return (concat placedRows, LevelGeom levelHeight 0 rowYs)
   where
     placeRow y = over (mapped . brPos . _y) (+y)
     scrWidth = fromIntegral screenWidth
     scrHeight = fromIntegral screenHeight
-    avg a b = (a + b) / 2
 
 
 
@@ -91,8 +90,14 @@ fillRectangles w h =
         px = startX + fromIntegral x * brickWidth
         py = startY + fromIntegral y * brickHeight
 
-alignRows :: [Float] -> [Float]
-alignRows heights = heights
+-- Calculates the vertical row centers based on the row heights, so the
+-- resulting list of rows is centered at the origin.
+alignRows :: Fractional a => [a] -> [a]
+alignRows heights = zipWith avg (init alignedBottoms) (tail alignedBottoms)
+  where
+    bottoms = scanl (+) 0 heights
+    alignedBottoms = map (subtract $ sum heights / 2) bottoms
+    avg x y = (x + y) / 2
 
 brickWidth :: Float
 brickWidth = 80
@@ -105,11 +110,38 @@ brickHeight = 30
 test :: Test.Test
 test = Test.testGroup "Spanout.Level"
   [ Test.testProperty
-      "alignRows results are ascending"
-      alignRows_resultAscending
+     "alignRows results are bounded by the sum of row heights"
+      alignRows_allInsideBounds
+  , Test.testProperty
+     "alignRows results touch bottom and top of bounding rectangle"
+      alignRows_touchesBounds
+  , Test.testProperty
+     "alignRows results are ascending"
+      alignRows_ascending
   ]
 
-alignRows_resultAscending :: [Float] -> Bool
-alignRows_resultAscending heights = centers == sort centers
+alignRows_allInsideBounds :: [Test.Positive Rational] -> Bool
+alignRows_allInsideBounds (map Test.getPositive -> heights) =
+  all inside $ zip heights centers
+  where
+    inside (height, center) = center - height / 2 >= -bound
+                           && center + height / 2 <=  bound
+    centers = alignRows heights
+    bound = sum heights / 2
+
+alignRows_touchesBounds :: Test.NonEmptyList (Test.Positive Rational) -> Bool
+alignRows_touchesBounds (map Test.getPositive . Test.getNonEmpty -> heights) =
+  touchesBottom && touchesTop
+  where
+    touchesBottom = firstCenter - firstHeight / 2 == -bound
+    touchesTop    = lastCenter  + lastHeight  / 2 ==  bound
+    (firstHeight, firstCenter) = (head heights, head centers)
+    (lastHeight,  lastCenter)  = (last heights, last centers)
+    centers = alignRows heights
+    bound = sum heights / 2
+
+alignRows_ascending :: [Test.Positive Rational] -> Bool
+alignRows_ascending (map Test.getPositive -> heights) =
+  centers == sort centers
   where
     centers = alignRows heights
