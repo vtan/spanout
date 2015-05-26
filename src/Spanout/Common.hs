@@ -2,25 +2,26 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Spanout.Common
-  ( Ball(..)
-  , ballPos
-  , ballVel
-  , BrickGeom(..)
-  , Brick(..)
-  , brPos
-  , brGeom
+  ( M
+  , type (->>)
+
   , GameState(..)
   , gsBall
   , gsBatX
   , gsBricks
   , gsLastCollision
   , gsBrickRows
+  , Ball(..)
+  , ballPos
+  , ballVel
+  , Brick(..)
+  , brPos
+  , brGeom
+  , BrickGeom(..)
 
   , Env(..)
   , envMouse
   , envKeys
-  , M
-  , type (->>)
 
   , screenWidth
   , screenHeight
@@ -54,21 +55,9 @@ import Linear
 
 
 
-data Ball = Ball
-  { _ballPos :: V2 Float
-  , _ballVel :: V2 Float
-  }
-makeLenses ''Ball
+type M = ReaderT Env (Rand StdGen)
 
-data BrickGeom
-  = Circle Float
-  | Rectangle Float Float
-
-data Brick = Brick
-  { _brPos :: V2 Float
-  , _brGeom :: BrickGeom
-  }
-makeLenses ''Brick
+type a ->> b = Wire (Wire.Timed Float ()) () M a b
 
 data GameState = GameState
   { _gsBall          :: Ball
@@ -77,18 +66,30 @@ data GameState = GameState
   , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
   , _gsBrickRows     :: [Float]
   }
-makeLenses ''GameState
+
+data Ball = Ball
+  { _ballPos :: V2 Float
+  , _ballVel :: V2 Float
+  }
+
+data Brick = Brick
+  { _brPos :: V2 Float
+  , _brGeom :: BrickGeom
+  }
+
+data BrickGeom
+  = Circle Float
+  | Rectangle Float Float
 
 data Env = Env
   { _envMouse :: V2 Float
   , _envKeys  :: Set Gloss.Key
   }
+
+makeLenses ''GameState
+makeLenses ''Ball
+makeLenses ''Brick
 makeLenses ''Env
-
-type M = ReaderT Env (Rand StdGen)
-
-type a ->> b = Wire (Wire.Timed Float ()) () M a b
-
 
 screenWidth :: Int
 screenWidth = 960
