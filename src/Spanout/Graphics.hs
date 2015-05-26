@@ -28,11 +28,11 @@ countdownDisplay = arr $ uncurry countdownPic
 
 gamePic :: GameState -> Gloss.Picture
 gamePic gs = Gloss.pictures $
-     map brickPic (view gsBricks gs)
+     [ levelGeomPic $ view gsLevelGeom gs ]
+  ++ map brickPic (view gsBricks gs)
   ++ [ ballPic      $ view (gsBall . ballPos) gs
      , batPic       $ view gsBatX gs
      , lastCollPic  $ view gsLastCollision gs
-     , levelGeomPic $ view gsLevelGeom gs
      ]
 
 countdownPic :: GameState -> Float -> Gloss.Picture
@@ -78,7 +78,7 @@ levelGeomPic (LevelGeom height offsetY rows) = heightPic <> rowsPic
               $ Gloss.rectangleWire (fromIntegral screenWidth) height
     rowsPic = Gloss.color col . Gloss.pictures $ map rowPic rows
     rowPic y = Gloss.line [(screenLeftBound, y), (screenRightBound, y)]
-    col = Gloss.light bgColor
+    col = Gloss.bright bgColor
 
 circleFilled :: Gloss.Color -> Float -> Gloss.Picture
 circleFilled color radius =
