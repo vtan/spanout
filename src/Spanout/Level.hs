@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 module Spanout.Level
   ( generateBricks
 
@@ -38,11 +36,12 @@ generateBricks = do
         | shape < (0.5 :: Float) = fillCircles
         | otherwise              = fillRectangles
     return $ gen w h
+  let levelHeight = scrHeight * relLevelHeight
+  offset <- getRandomR (0, screenUpperBound - levelHeight / 2 - 2 * ballRadius)
   let
-    levelHeight = scrHeight * relLevelHeight
-    rowYs = alignRows rowHeights
+    rowYs = alignRows offset rowHeights
     placedRows = zipWith placeRow rowYs rows
-  return (concat placedRows, LevelGeom levelHeight 0 rowYs)
+  return (concat placedRows, LevelGeom levelHeight offset rowYs)
   where
     placeRow y = over (mapped . brPos . _y) (+y)
     scrWidth = fromIntegral screenWidth
@@ -92,8 +91,9 @@ fillRectangles w h =
 
 -- Calculates the vertical row centers based on the row heights, so the
 -- resulting list of rows is centered at the origin.
-alignRows :: Fractional a => [a] -> [a]
-alignRows heights = zipWith avg (init alignedBottoms) (tail alignedBottoms)
+alignRows :: Fractional a => a -> [a] -> [a]
+alignRows offset heights =
+  map (offset+) $ zipWith avg (init alignedBottoms) (tail alignedBottoms)
   where
     bottoms = scanl (+) 0 heights
     alignedBottoms = map (subtract $ sum heights / 2) bottoms
@@ -120,28 +120,31 @@ test = Test.testGroup "Spanout.Level"
       alignRows_ascending
   ]
 
-alignRows_allInsideBounds :: [Test.Positive Rational] -> Bool
-alignRows_allInsideBounds (map Test.getPositive -> heights) =
+alignRows_allInsideBounds :: Rational -> [Test.Positive Rational] -> Bool
+alignRows_allInsideBounds offset heights' =
   all inside $ zip heights centers
   where
-    inside (height, center) = center - height / 2 >= -bound
-                           && center + height / 2 <=  bound
-    centers = alignRows heights
+    heights = map Test.getPositive heights'
+    centers = alignRows offset heights
+    inside (height, center) = center - height / 2 >= offset - bound
+                           && center + height / 2 <= offset + bound
     bound = sum heights / 2
 
-alignRows_touchesBounds :: Test.NonEmptyList (Test.Positive Rational) -> Bool
-alignRows_touchesBounds (map Test.getPositive . Test.getNonEmpty -> heights) =
+alignRows_touchesBounds ::
+  Rational -> Test.NonEmptyList (Test.Positive Rational) -> Bool
+alignRows_touchesBounds offset heights' =
   touchesBottom && touchesTop
   where
-    touchesBottom = firstCenter - firstHeight / 2 == -bound
-    touchesTop    = lastCenter  + lastHeight  / 2 ==  bound
+    heights = map Test.getPositive $ Test.getNonEmpty heights'
+    centers = alignRows offset heights
+    touchesBottom = firstCenter - firstHeight / 2 == offset - bound
+    touchesTop    = lastCenter  + lastHeight  / 2 == offset + bound
     (firstHeight, firstCenter) = (head heights, head centers)
     (lastHeight,  lastCenter)  = (last heights, last centers)
-    centers = alignRows heights
     bound = sum heights / 2
 
-alignRows_ascending :: [Test.Positive Rational] -> Bool
-alignRows_ascending (map Test.getPositive -> heights) =
-  centers == sort centers
+alignRows_ascending :: Rational -> [Test.Positive Rational] -> Bool
+alignRows_ascending offset heights' = centers == sort centers
   where
-    centers = alignRows heights
+    heights = map Test.getPositive heights'
+    centers = alignRows offset heights
