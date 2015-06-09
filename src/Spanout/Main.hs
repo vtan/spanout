@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Spanout.Main (main) where
@@ -23,7 +24,9 @@ import qualified System.Exit as System (exitSuccess)
 
 
 
-mainWire :: a ->> Maybe Gloss.Picture
+type MainWire = () ->> Maybe Gloss.Picture
+
+mainWire :: MainWire
 mainWire = exitOnEsc =>>>= countdown'
   where
     countdown' :: a ->> Maybe Gloss.Picture
@@ -31,39 +34,51 @@ mainWire = exitOnEsc =>>>= countdown'
     game' :: GameState -> a ->> Maybe Gloss.Picture
     game' k = Wire.switch $ (gameLogic k =>>> gameDisplay) `Wire.followedBy` countdown'
 
-type World = (() ->> Maybe Gloss.Picture, Env, Gloss.Picture)
+data World = World
+  { _worldWire    :: MainWire
+  , _worldEnv     :: Env
+  , _worldLastPic :: Gloss.Picture
+  }
+
+makeLenses ''World
 
 main :: IO ()
 main = Gloss.playIO disp bgColor fps world obtainPicture registerEvent performIteration
   where
     disp = Gloss.InWindow "breakout" (screenWidth, screenHeight) (100, 100)
     fps = 60
-    world = (mainWire, env, Gloss.blank)
+    world = World
+      { _worldWire    = mainWire
+      , _worldEnv     = env
+      , _worldLastPic = Gloss.blank
+      }
     env = Env
       { _envMouse = zero
       , _envKeys  = Set.empty
       }
 
+
+
 registerEvent :: Gloss.Event -> World -> IO World
 registerEvent (Gloss.EventMotion (x, y)) world =
-  return $ set (_2 . envMouse) (V2 x y) world
+  return $ set (worldEnv . envMouse) (V2 x y) world
 registerEvent (Gloss.EventKey key Gloss.Down _ _) world =
-  return $ over (_2 . envKeys) (Set.insert key) world
+  return $ over (worldEnv . envKeys) (Set.insert key) world
 registerEvent (Gloss.EventKey key Gloss.Up _ _) world =
-  return $ over (_2 . envKeys) (Set.delete key) world
+  return $ over (worldEnv . envKeys) (Set.delete key) world
 registerEvent _event world =
   return world
 
 performIteration :: Float -> World -> IO World
-performIteration dTime (wire, mouseX, _lastPic) = do
+performIteration dTime world = do
   let
     timed = Wire.Timed dTime ()
     input = Right ()
-    mb = Wire.stepWire wire timed input
-  (Right mpic, wire') <- evalRandIO $ runReaderT mb mouseX
+    mb = Wire.stepWire (view worldWire world) timed input
+  (Right mpic, wire') <- evalRandIO . runReaderT mb $ view worldEnv world
   case mpic of
-    Just pic -> return (wire', mouseX, pic)
+    Just pic -> return $ set worldWire wire' . set worldLastPic pic $ world
     Nothing  -> System.exitSuccess
 
 obtainPicture :: World -> IO Gloss.Picture
-obtainPicture (_wire, _mouseX, pic) = return pic
+obtainPicture = return . view worldLastPic
