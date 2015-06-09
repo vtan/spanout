@@ -28,17 +28,24 @@ countdownDisplay = arr $ uncurry countdownPic
 
 gamePic :: GameState -> Gloss.Picture
 gamePic gs = Gloss.pictures $
-     [ levelGeomPic $ view gsLevelGeom gs ]
+     [ bg
+     , levelGeomPic $ view gsLevelGeom gs
+     ]
   ++ map brickPic (view gsBricks gs)
   ++ [ ballPic      $ view (gsBall . ballPos) gs
      , batPic       $ view gsBatX gs
      , lastCollPic  $ view gsLastCollision gs
      ]
+  where
+    bg = Gloss.color bgColor
+       $ Gloss.rectangleSolid screenWidth screenHeight
 
 countdownPic :: GameState -> Float -> Gloss.Picture
 countdownPic gs remaining = gamePic gs <> remainingText
   where
-    remainingText = Gloss.color Gloss.chartreuse $ Gloss.text str
+    remainingText = Gloss.scale 4e-3 4e-3
+                  . Gloss.color Gloss.chartreuse
+                  $ Gloss.text str
     str = show (ceiling remaining :: Int)
 
 ballPic :: V2 Float -> Gloss.Picture
@@ -61,9 +68,9 @@ lastCollPic = maybe Gloss.blank pics
   where
     pics (pos, before, normal, after) =
       let
-        before' = (pos - 50 *^ normalize before, pos)
-        normal' = (pos, pos + 50 *^ normal)
-        after'  = (pos, pos + 50 *^ normalize after)
+        before' = (pos - batWidth *^ normalize before, pos)
+        normal' = (pos, pos + batWidth *^ normal)
+        after'  = (pos, pos + batWidth *^ normalize after)
       in
         Gloss.pictures $ zipWith Gloss.color
           [Gloss.aquamarine, Gloss.chartreuse, Gloss.orange]
@@ -75,9 +82,9 @@ levelGeomPic (LevelGeom height offsetY rows) = heightPic <> rowsPic
   where
     heightPic = Gloss.color col
               . Gloss.translate 0 offsetY
-              $ Gloss.rectangleWire (fromIntegral screenWidth) height
+              $ Gloss.rectangleWire screenWidth height
     rowsPic = Gloss.color col . Gloss.pictures $ map rowPic rows
-    rowPic y = Gloss.line [(screenLeftBound, y), (screenRightBound, y)]
+    rowPic y = Gloss.line [(-screenBoundX, y), (screenBoundX, y)]
     col = Gloss.bright bgColor
 
 circleFilled :: Gloss.Color -> Float -> Gloss.Picture

@@ -73,7 +73,7 @@ moveBat = proc gs -> do
 
 ballAlive :: Ball ->> Maybe Ball
 ballAlive = arr $ \ball ->
-  if view (ballPos . _y) ball > screenLowerBound
+  if view (ballPos . _y) ball > -screenBoundY
   then Just ball
   else Nothing
 
@@ -136,9 +136,9 @@ bounceBall (Ball pos vel) normal
 
 ballEdgeNormal :: V2 Float -> Maybe (V2 Float)
 ballEdgeNormal (V2 px py)
-  | px <= screenLeftBound  = Just $  unit _x
-  | px >= screenRightBound = Just $ -unit _x
-  | py >= screenUpperBound = Just $ -unit _y
+  | px <= -screenBoundX = Just $  unit _x
+  | px >=  screenBoundX = Just $ -unit _x
+  | py >=  screenBoundY = Just $ -unit _y
   | otherwise              = Nothing
 
 ballBatNormal :: Float -> V2 Float -> Maybe (V2 Float)
@@ -185,7 +185,10 @@ stateInit :: (MonadRandom m, Applicative m) => m GameState
 stateInit = do
   (bricks, levelGeom) <- generateBricks
   return GameState
-    { _gsBall = Ball (V2 0 (screenLowerBound + 4 * batHeight)) (V2 0 (-6))
+    { _gsBall = Ball
+      { _ballPos = V2 0 (-screenBoundY + 4 * batHeight)
+      , _ballVel = V2 0 (-0.6 * ballRadius)
+      }
     , _gsBatX = 0
     , _gsBricks = bricks
     , _gsLevelGeom = levelGeom

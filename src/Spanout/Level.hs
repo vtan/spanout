@@ -37,15 +37,15 @@ generateBricks = do
         | otherwise              = fillRectangles
     return $ gen w h
   let levelHeight = scrHeight * relLevelHeight
-  offset <- getRandomR (0, screenUpperBound - levelHeight / 2 - 2 * ballRadius)
+  offset <- getRandomR (0, screenBoundY - levelHeight / 2 - 2 * ballRadius)
   let
     rowYs = alignRows offset rowHeights
     placedRows = zipWith placeRow rowYs rows
   return (concat placedRows, LevelGeom levelHeight offset rowYs)
   where
     placeRow y = over (mapped . brPos . _y) (+y)
-    scrWidth = fromIntegral screenWidth
-    scrHeight = fromIntegral screenHeight
+    scrWidth = screenWidth
+    scrHeight = screenHeight
 
 
 
@@ -100,10 +100,10 @@ alignRows offset heights =
     avg x y = (x + y) / 2
 
 brickWidth :: Float
-brickWidth = 80
+brickWidth = 0.3
 
 brickHeight :: Float
-brickHeight = 30
+brickHeight = 0.1
 
 
 

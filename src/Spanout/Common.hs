@@ -29,10 +29,8 @@ module Spanout.Common
 
   , screenWidth
   , screenHeight
-  , screenRightBound
-  , screenLeftBound
-  , screenUpperBound
-  , screenLowerBound
+  , screenBoundX
+  , screenBoundY
   , ballRadius
   , batWidth
   , batHeight
@@ -102,35 +100,29 @@ makeLenses ''Brick
 makeLenses ''LevelGeom
 makeLenses ''Env
 
-screenWidth :: Int
-screenWidth = 960
+screenWidth :: Float
+screenWidth = 2 * (16 / 9)
 
-screenHeight :: Int
-screenHeight = 540
+screenHeight :: Float
+screenHeight = 2
 
-screenRightBound :: Float
-screenRightBound = fromIntegral screenWidth / 2
+screenBoundX :: Float
+screenBoundX = screenWidth / 2
 
-screenLeftBound :: Float
-screenLeftBound = -screenRightBound
-
-screenUpperBound :: Float
-screenUpperBound = fromIntegral screenHeight / 2
-
-screenLowerBound :: Float
-screenLowerBound = -screenUpperBound
+screenBoundY :: Float
+screenBoundY = screenHeight / 2
 
 ballRadius :: Float
-ballRadius = 10
+ballRadius = 0.04
 
 batWidth :: Float
-batWidth = 160
+batWidth = 0.5
 
 batHeight :: Float
-batHeight = 16
+batHeight = 0.05
 
 batPositionY :: Float
-batPositionY = screenLowerBound + batHeight / 2
+batPositionY = -screenBoundY + batHeight / 2
 
 batSpread :: Float
 batSpread = pi / 12
