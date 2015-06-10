@@ -2,9 +2,11 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Spanout.Gameplay
-  ( gameLogic
+  ( GameEndReason(..)
+  , gameLogic
   , countdownLogic
   , exitOnEsc
+  , stateInit
   ) where
 
 import Spanout.Common
@@ -28,12 +30,21 @@ import Linear
 
 
 
-gameLogic :: GameState -> a ->> Maybe GameState
+data GameEndReason
+  = LevelDone
+  | BallFallen
+
+gameLogic :: GameState -> a ->> Either GameEndReason GameState
 gameLogic initGs = proc _ -> do
   rec
     state' <- update <<< Wire.delay initGs -< state
     let state = fromJust state'
-  returnA -< state'
+  returnA -<
+    case state' of
+      Just s
+        | null $ view gsBricks s -> Left LevelDone
+        | otherwise              -> Right s
+      Nothing                    -> Left BallFallen
   where
     update :: GameState ->> Maybe GameState
     update = over gsBall moveBall
@@ -44,10 +55,10 @@ gameLogic initGs = proc _ -> do
            <+> Wire.overI gsBall ballAlive
     moveBall (Ball pos vel) = Ball (pos + vel) vel
 
-countdownLogic :: a ->> Either GameState (GameState, Float)
-countdownLogic = proc _ -> do
+countdownLogic :: GameState -> a ->> Either GameState (GameState, Float)
+countdownLogic initGs = proc _ -> do
   t <- Wire.time -< ()
-  rec state <- moveBat <<< Wire.delayM stateInit -< state
+  rec state <- moveBat <<< Wire.delay initGs -< state
   let remaining = countdownTime - t
   returnA -<
     if remaining <= 0
@@ -63,6 +74,20 @@ exitOnEsc = proc a -> do
       else Nothing
   where
     esc = Gloss.SpecialKey Gloss.KeyEsc
+
+stateInit :: (MonadRandom m, Applicative m) => m GameState
+stateInit = do
+  (bricks, levelGeom) <- generateBricks
+  return $ GameState
+    { _gsBall = Ball
+      { _ballPos = V2 0 (-screenBoundY + 4 * batHeight)
+      , _ballVel = V2 0 (-0.6 * ballRadius)
+      }
+    , _gsBatX = 0
+    , _gsBricks = bricks
+    , _gsLevelGeom = levelGeom
+    , _gsLastCollision = Nothing
+    }
 
 
 
@@ -180,17 +205,3 @@ batNormal x batX = perp . angle $ batSpread * relX
 
 reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
-
-stateInit :: (MonadRandom m, Applicative m) => m GameState
-stateInit = do
-  (bricks, levelGeom) <- generateBricks
-  return GameState
-    { _gsBall = Ball
-      { _ballPos = V2 0 (-screenBoundY + 4 * batHeight)
-      , _ballVel = V2 0 (-0.6 * ballRadius)
-      }
-    , _gsBatX = 0
-    , _gsBricks = bricks
-    , _gsLevelGeom = levelGeom
-    , _gsLastCollision = Nothing
-    }

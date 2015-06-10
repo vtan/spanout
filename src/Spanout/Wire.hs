@@ -6,6 +6,7 @@ module Spanout.Wire
   , (<+|)
   , constM
   , delayM
+  , bindW
   , overW
   , overI
   , WireTag(..)
@@ -50,6 +51,11 @@ delayM :: Monad m => m a -> Wire s e m a a
 delayM ma = Wire.mkGenN $ \a' -> do
   a <- ma
   return (Right a, Wire.delay a')
+
+bindW :: (Monad m, Monoid s) => m k -> (k -> Wire s e m a b) -> Wire s e m a b
+bindW mk f = Wire.mkGen $ \s a -> do
+  k <- mk
+  Wire.stepWire (f k) s (Right a)
 
 overW :: Arrow p => Lens s s a a -> p a a -> p s s
 overW l w = proc a -> do

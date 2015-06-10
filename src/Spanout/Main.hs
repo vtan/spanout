@@ -28,12 +28,23 @@ import qualified System.Exit as System (exitSuccess)
 type MainWire = () ->> Maybe Gloss.Picture
 
 mainWire :: MainWire
-mainWire = exitOnEsc =>>>= countdown'
+mainWire = exitOnEsc =>>>= newLevel
   where
-    countdown' :: a ->> Maybe Gloss.Picture
-    countdown' = Wire.switch $ (countdownLogic =>>> countdownDisplay) `Wire.choose` game'
-    game' :: GameState -> a ->> Maybe Gloss.Picture
-    game' k = Wire.switch $ (gameLogic k =>>> gameDisplay) `Wire.followedBy` countdown'
+    newLevel :: a ->> Maybe Gloss.Picture
+    newLevel = Wire.bindW stateInit level
+
+    level :: GameState -> a ->> Maybe Gloss.Picture
+    level gs =
+      Wire.switch . Wire.choose (countdown gs) $ \gs' ->
+      Wire.switch . Wire.choose (game gs') $ \r -> case r of
+        BallFallen -> level gs
+        LevelDone  -> newLevel
+
+    countdown :: GameState -> a ->> Either GameState Gloss.Picture
+    countdown gs = countdownLogic gs =>>> countdownDisplay
+
+    game :: GameState -> a ->> Either GameEndReason Gloss.Picture
+    game gs = gameLogic gs =>>> gameDisplay
 
 data World = World
   { _worldWire    :: MainWire
