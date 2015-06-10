@@ -9,6 +9,7 @@ import Spanout.Graphics
 import Spanout.Wire ((=>>>=), (=>>>))
 import qualified Spanout.Wire as Wire
 
+import Control.Applicative
 import Control.Lens
 import Control.Monad.Random
 import Control.Monad.Reader
@@ -44,7 +45,7 @@ mainWire = exitOnEsc =>>>= newLevel
     countdown gs = countdownLogic gs =>>> countdownDisplay
 
     game :: GameState -> a ->> Either GameEndReason Gloss.Picture
-    game gs = gameLogic gs =>>> gameDisplay
+    game gs = (*>) <$> nextLevelOnKey <*> gameLogic gs =>>> gameDisplay
 
 data World = World
   { _worldWire    :: MainWire

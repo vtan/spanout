@@ -6,6 +6,7 @@ module Spanout.Gameplay
   , gameLogic
   , countdownLogic
   , exitOnEsc
+  , nextLevelOnKey
   , stateInit
   ) where
 
@@ -74,6 +75,14 @@ exitOnEsc = proc a -> do
       else Nothing
   where
     esc = Gloss.SpecialKey Gloss.KeyEsc
+
+nextLevelOnKey :: a ->> Either GameEndReason a
+nextLevelOnKey = proc a -> do
+  keys <- Wire.constM $ view envKeys -< ()
+  returnA -<
+    if Set.notMember (Gloss.SpecialKey Gloss.KeySpace) keys
+      then Right a
+      else Left LevelDone
 
 stateInit :: (MonadRandom m, Applicative m) => m GameState
 stateInit = do
