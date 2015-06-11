@@ -11,6 +11,7 @@ import Control.Lens (over, mapped)
 import Control.Monad
 import Control.Monad.Random
 
+import Data.AEq (AEq, (~==))
 import Data.Fixed (divMod')
 import Data.List (sort)
 
@@ -91,7 +92,7 @@ fillRectangles w h =
 
 -- Calculates the vertical row centers based on the row heights, so the
 -- resulting list of rows is centered at the origin.
-alignRows :: Fractional a => a -> [a] -> [a]
+alignRows :: Float -> [Float] -> [Float]
 alignRows offset heights =
   map (offset+) $ zipWith avg (init alignedBottoms) (tail alignedBottoms)
   where
@@ -120,31 +121,39 @@ test = Test.testGroup "Spanout.Level"
       alignRows_ascending
   ]
 
-alignRows_allInsideBounds :: Rational -> [Test.Positive Rational] -> Bool
+alignRows_allInsideBounds :: Float -> [Test.Positive Float] -> Bool
 alignRows_allInsideBounds offset heights' =
   all inside $ zip heights centers
   where
     heights = map Test.getPositive heights'
     centers = alignRows offset heights
-    inside (height, center) = center - height / 2 >= offset - bound
-                           && center + height / 2 <= offset + bound
+    inside (height, center) = center - height / 2 ~>= offset - bound
+                           && center + height / 2 ~<= offset + bound
     bound = sum heights / 2
 
 alignRows_touchesBounds ::
-  Rational -> Test.NonEmptyList (Test.Positive Rational) -> Bool
+  Float -> Test.NonEmptyList (Test.Positive Float) -> Bool
 alignRows_touchesBounds offset heights' =
   touchesBottom && touchesTop
   where
     heights = map Test.getPositive $ Test.getNonEmpty heights'
     centers = alignRows offset heights
-    touchesBottom = firstCenter - firstHeight / 2 == offset - bound
-    touchesTop    = lastCenter  + lastHeight  / 2 == offset + bound
+    touchesBottom = firstCenter - firstHeight / 2 ~== offset - bound
+    touchesTop    = lastCenter  + lastHeight  / 2 ~== offset + bound
     (firstHeight, firstCenter) = (head heights, head centers)
     (lastHeight,  lastCenter)  = (last heights, last centers)
     bound = sum heights / 2
 
-alignRows_ascending :: Rational -> [Test.Positive Rational] -> Bool
+alignRows_ascending :: Float -> [Test.Positive Float] -> Bool
 alignRows_ascending offset heights' = centers == sort centers
   where
     heights = map Test.getPositive heights'
     centers = alignRows offset heights
+
+infix 4 ~>=
+(~>=) :: (Ord a, AEq a) => a -> a -> Bool
+x ~>= y = x >= y || x ~== y
+
+infix 4 ~<=
+(~<=) :: (Ord a, AEq a) => a -> a -> Bool
+x ~<= y = x <= y || x ~== y

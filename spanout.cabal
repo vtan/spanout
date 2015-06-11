@@ -30,6 +30,7 @@ executable spanout
     MonadRandom >=0.4 && <0.5,
     netwire >=5.0 && <5.1,
     gloss >=1.8 && <1.9,
+    ieee754 >=0.7 && <0.8,
     QuickCheck >=2.4 && <2.9,
     test-framework >=0.7.1,
     test-framework-quickcheck2
@@ -43,7 +44,7 @@ test-suite spanout-test
     Spanout.Common, Spanout.Gameplay, Spanout.Graphics, Spanout.Level,
     Spanout.Main, Spanout.Wire
   other-extensions:
-    Arrows, RankNTypes, TemplateHaskell, TypeOperators, ViewPatterns
+    Arrows, RankNTypes, TemplateHaskell, TypeOperators
   build-depends:
     base >=4.6 && <5,
     mtl >=2.2 && <2.3,
@@ -53,6 +54,7 @@ test-suite spanout-test
     MonadRandom >=0.4 && <0.5,
     netwire >=5.0 && <5.1,
     gloss >=1.8 && <1.9,
+    ieee754 >=0.7 && <0.8,
     QuickCheck >=2.4 && <2.9,
     test-framework >=0.7.1,
     test-framework-quickcheck2
