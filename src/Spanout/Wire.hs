@@ -14,6 +14,7 @@ module Spanout.Wire
   , switch
   , followedBy
   , choose
+  , currentDelta
 
   , Wire
   , Wire.Timed(..)
@@ -116,3 +117,6 @@ w1 `choose` g = w1 >>> arr f
   where
     f (Right b) = Right $ pure b
     f (Left  k) = Left  $ g k
+
+currentDelta :: Wire.HasTime t s => Wire s e m a t
+currentDelta = Wire.mkSF $ \dt _ -> (Wire.dtime dt, currentDelta)

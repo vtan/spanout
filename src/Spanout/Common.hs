@@ -32,6 +32,7 @@ module Spanout.Common
   , screenBoundX
   , screenBoundY
   , ballRadius
+  , ballVelocity
   , batWidth
   , batHeight
   , batPositionY
@@ -117,6 +118,9 @@ screenBoundY = screenHeight / 2
 ballRadius :: Float
 ballRadius = 0.04
 
+ballVelocity :: Float
+ballVelocity = 1.7
+
 batWidth :: Float
 batWidth = 0.5
 
@@ -134,7 +138,6 @@ brickWidth = 0.3
 
 brickHeight :: Float
 brickHeight = 0.1
-
 
 countdownTime :: Float
 countdownTime = 3

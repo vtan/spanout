@@ -48,13 +48,15 @@ gameLogic initGs = proc _ -> do
       Nothing                    -> Left BallFallen
   where
     update :: GameState ->> Maybe GameState
-    update = over gsBall moveBall
-         ^>> moveBat
+    update = Wire.overW gsBall moveBall
+         >>> moveBat
            >>> collideBallBrick
            <+> collideBallEdge
            <+> collideBallBat
            <+> Wire.overI gsBall ballAlive
-    moveBall (Ball pos vel) = Ball (pos + vel) vel
+    moveBall = proc (Ball pos vel) -> do
+      dt <- Wire.currentDelta -< ()
+      returnA -< Ball (pos + dt *^ vel) vel
 
 countdownLogic :: GameState -> a ->> Either GameState (GameState, Float)
 countdownLogic initGs = proc _ -> do
@@ -90,7 +92,7 @@ stateInit = do
   return $ GameState
     { _gsBall = Ball
       { _ballPos = V2 0 (-screenBoundY + 4 * batHeight)
-      , _ballVel = V2 0 (-0.6 * ballRadius)
+      , _ballVel = V2 0 (-ballVelocity)
       }
     , _gsBatX = 0
     , _gsBricks = bricks
