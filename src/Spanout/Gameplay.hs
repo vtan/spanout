@@ -194,16 +194,15 @@ ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) ball
   | tooFar = Nothing
   | hitX = Just $ signum (ballY - y) *^ unit _y
   | hitY = Just $ signum (ballX - x) *^ unit _x
-  | hitCorner = Just . normalize $ signum <$> dist
   | otherwise = Nothing
   where
     dist = view ballPos ball - pos
     V2 distAbsX distAbsY = abs <$> dist
     V2 ballX ballY = view ballPos ball
-    tooFar = distAbsX > width / 2 + ballRadius
+    tooFar = distAbsX > width  / 2 + ballRadius
           || distAbsY > height / 2 + ballRadius
-    hitX = distAbsX <= width / 2
-    hitY = distAbsY <= height / 2
+    hitX = distAbsX <= width  / 2 || (hitCorner && distAbsX > distAbsY)
+    hitY = distAbsY <= height / 2 || (hitCorner && distAbsY > distAbsX)
     hitCorner = quadrance (V2 (distAbsX - width / 2) (distAbsY - height / 2))
              <= ballRadius ^ (2 :: Int)
 
