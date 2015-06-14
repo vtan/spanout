@@ -25,11 +25,11 @@ import qualified Test.QuickCheck as Test
 
 generateBricks :: (MonadRandom m, Applicative m) => m ([Brick], LevelGeom)
 generateBricks = do
-  relLevelHeight <- getRandomR (0.2, 0.6)
+  relLevelHeight <- getRandomR (0.3, 0.8)
   relRowHeights <- splitRow relLevelHeight
   let rowHeights = map (scrHeight *) relRowHeights
   rows <- forM rowHeights $ \h -> do
-    relW <- getRandomR (0.3, 0.9)
+    relW <- getRandomR (0.2, 0.9)
     shape <- getRandom
     let
       w = scrWidth * relW
@@ -42,7 +42,9 @@ generateBricks = do
   let
     rowYs = alignRows offset rowHeights
     placedRows = zipWith placeRow rowYs rows
-  return (concat placedRows, LevelGeom levelHeight offset rowYs)
+  case concat placedRows of
+    []     -> generateBricks
+    bricks -> return (bricks, LevelGeom levelHeight offset rowYs)
   where
     placeRow y = over (mapped . brPos . _y) (+y)
     scrWidth = screenWidth
@@ -52,12 +54,12 @@ generateBricks = do
 
 splitRow :: (MonadRandom m, Applicative m) => Float -> m [Float]
 splitRow h
-  | h <= 0.1 = return [h]
+  | h <= 0.15 = return [h]
   | otherwise = do
-      shouldSplit <- getRandom
-      if shouldSplit < (0.6 :: Float)
+      splitFurther <- getRandom
+      if splitFurther < (0.8 :: Float)
       then do
-        ratio <- getRandomR (0.2, 0.8)
+        ratio <- getRandomR (0.3, 0.7)
         (++) <$> splitRow (ratio * h) <*> splitRow ((1 - ratio) * h)
       else return [h]
 
@@ -99,12 +101,6 @@ alignRows offset heights =
     bottoms = scanl (+) 0 heights
     alignedBottoms = map (subtract $ sum heights / 2) bottoms
     avg x y = (x + y) / 2
-
-brickWidth :: Float
-brickWidth = 0.3
-
-brickHeight :: Float
-brickHeight = 0.1
 
 
 

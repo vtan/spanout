@@ -36,6 +36,8 @@ module Spanout.Common
   , batHeight
   , batPositionY
   , batSpread
+  , brickWidth
+  , brickHeight
   , countdownTime
   , bgColor
   , ballColor
@@ -126,6 +128,13 @@ batPositionY = -screenBoundY + batHeight / 2
 
 batSpread :: Float
 batSpread = pi / 12
+
+brickWidth :: Float
+brickWidth = 0.3
+
+brickHeight :: Float
+brickHeight = 0.1
+
 
 countdownTime :: Float
 countdownTime = 3
