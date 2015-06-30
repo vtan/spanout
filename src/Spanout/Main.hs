@@ -5,11 +5,8 @@ module Spanout.Main (main) where
 
 import Spanout.Common
 import Spanout.Gameplay
-import Spanout.Graphics
-import Spanout.Wire ((=>>>=), (=>>>))
-import qualified Spanout.Wire as Wire
+import Spanout.Wire
 
-import Control.Applicative
 import Control.Lens
 import Control.Monad.Random
 import Control.Monad.Reader
@@ -26,26 +23,7 @@ import qualified System.Exit as System (exitSuccess)
 
 
 
-type MainWire = () ->> Maybe Gloss.Picture
-
-mainWire :: MainWire
-mainWire = exitOnEsc =>>>= newLevel
-  where
-    newLevel :: a ->> Maybe Gloss.Picture
-    newLevel = Wire.bindW stateInit level
-
-    level :: GameState -> a ->> Maybe Gloss.Picture
-    level gs =
-      Wire.switch . Wire.choose (countdown gs) $ \gs' ->
-      Wire.switch . Wire.choose (game gs') $ \r -> case r of
-        BallFallen -> level gs
-        LevelDone  -> newLevel
-
-    countdown :: GameState -> a ->> Either GameState Gloss.Picture
-    countdown gs = countdownLogic gs =>>> countdownDisplay
-
-    game :: GameState -> a ->> Either GameEndReason Gloss.Picture
-    game gs = (*>) <$> nextLevelOnKey <*> gameLogic gs =>>> gameDisplay
+type MainWire = () ->> Gloss.Picture
 
 data World = World
   { _worldWire    :: MainWire
@@ -64,7 +42,7 @@ main = Gloss.playIO disp Gloss.black fps world
     fps = 60
     winSize = (960, 540)
     world = World
-      { _worldWire     = mainWire
+      { _worldWire     = game
       , _worldEnv      = env
       , _worldLastPic  = Gloss.blank
       , _worldViewPort = viewPort winSize
@@ -92,13 +70,13 @@ registerEvent (Gloss.EventKey key Gloss.Up _ _) world =
 performIteration :: Float -> World -> IO World
 performIteration dTime world = do
   let
-    timed = Wire.Timed dTime ()
+    timed = Timed dTime ()
     input = Right ()
-    mb = Wire.stepWire (view worldWire world) timed input
-  (Right mpic, wire') <- evalRandIO . runReaderT mb $ view worldEnv world
-  case mpic of
-    Just pic -> return $ set worldWire wire' . set worldLastPic pic $ world
-    Nothing  -> System.exitSuccess
+    mb = stepWire (view worldWire world) timed input
+  (epic, wire') <- evalRandIO . runReaderT mb $ view worldEnv world
+  case epic of
+    Right pic -> return $ set worldWire wire' . set worldLastPic pic $ world
+    Left ()   -> System.exitSuccess
 
 obtainPicture :: World -> IO Gloss.Picture
 obtainPicture world = return $ Gloss.applyViewPortToPicture vp pic

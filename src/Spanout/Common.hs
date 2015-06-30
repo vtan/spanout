@@ -9,8 +9,6 @@ module Spanout.Common
   , gsBall
   , gsBatX
   , gsBricks
-  , gsLastCollision
-  , gsLevelGeom
   , Ball(..)
   , ballPos
   , ballVel
@@ -18,10 +16,6 @@ module Spanout.Common
   , brPos
   , brGeom
   , BrickGeom(..)
-  , LevelGeom(..)
-  , lvlgeomHeight
-  , lvlgeomOffsetY
-  , lvlgeomRowHeights
 
   , Env(..)
   , envMouse
@@ -32,7 +26,7 @@ module Spanout.Common
   , screenBoundX
   , screenBoundY
   , ballRadius
-  , ballVelocity
+  , ballInit
   , batWidth
   , batHeight
   , batPositionY
@@ -44,13 +38,15 @@ module Spanout.Common
   , ballColor
   , batColor
   , brickColor
+  , countdownTextScale
+  , countdownTextColor
   ) where
+
+import Spanout.Wire
 
 import Control.Lens
 import Control.Monad.Random
 import Control.Monad.Reader
-import Control.Wire (Wire)
-import qualified Control.Wire as Wire
 
 import Data.Set (Set)
 
@@ -62,14 +58,12 @@ import Linear
 
 type M = ReaderT Env (Rand StdGen)
 
-type a ->> b = Wire (Wire.Timed Float ()) () M a b
+type a ->> b = Wire (Timed Float ()) () M a b
 
 data GameState = GameState
   { _gsBall          :: Ball
   , _gsBatX          :: Float
   , _gsBricks        :: [Brick]
-  , _gsLastCollision :: Maybe (V2 Float, V2 Float, V2 Float, V2 Float)
-  , _gsLevelGeom     :: LevelGeom
   }
 
 data Ball = Ball
@@ -86,12 +80,6 @@ data BrickGeom
   = Circle Float
   | Rectangle Float Float
 
-data LevelGeom = LevelGeom
-  { _lvlgeomHeight     :: Float
-  , _lvlgeomOffsetY    :: Float
-  , _lvlgeomRowHeights :: [Float]
-  }
-
 data Env = Env
   { _envMouse :: V2 Float
   , _envKeys  :: Set Gloss.Key
@@ -100,7 +88,6 @@ data Env = Env
 makeLenses ''GameState
 makeLenses ''Ball
 makeLenses ''Brick
-makeLenses ''LevelGeom
 makeLenses ''Env
 
 screenWidth :: Float
@@ -118,8 +105,11 @@ screenBoundY = screenHeight / 2
 ballRadius :: Float
 ballRadius = 0.04
 
-ballVelocity :: Float
-ballVelocity = 1.7
+ballInit :: Ball
+ballInit = Ball
+  { _ballPos = V2 0 (-screenBoundY + 4 * batHeight)
+  , _ballVel = V2 0 (-1.7)
+  }
 
 batWidth :: Float
 batWidth = 0.5
@@ -153,3 +143,9 @@ batColor = Gloss.makeColor8 0x5e 0x85 0x9a 0xff
 
 brickColor :: Gloss.Color
 brickColor = Gloss.makeColor8 0xaa 0x52 0x39 0xff
+
+countdownTextScale :: Float
+countdownTextScale = 0.005
+
+countdownTextColor :: Gloss.Color
+countdownTextColor = Gloss.chartreuse
