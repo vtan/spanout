@@ -111,24 +111,24 @@ ballBatNormal batX (V2 px py)
     by  = py <= batPositionY + batHeight / 2 + ballRadius
 
 ballBrickCollision :: Ball -> [Brick] -> Maybe ([V2 Float], [Brick])
-ballBrickCollision (Ball pos _) bricks =
+ballBrickCollision ball bricks =
   case collisionNormals of
     [] -> Nothing
     _  -> Just (collisionNormals, remBricks)
   where
     check brick =
-      case ballBrickNormal brick pos of
+      case ballBrickNormal brick ball of
         Just normal -> Right normal
         _           -> Left brick
     (remBricks, collisionNormals) = partitionEithers . map check $ bricks
 
-ballBrickNormal :: Brick -> V2 Float -> Maybe (V2 Float)
-ballBrickNormal (Brick pos (Circle radius)) bpos
+ballBrickNormal :: Brick -> Ball -> Maybe (V2 Float)
+ballBrickNormal (Brick pos (Circle radius)) (Ball bpos _)
   | hit = Just . normalize $ bpos - pos
   | otherwise = Nothing
   where
     hit = distance bpos pos <= radius + ballRadius
-ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) bpos
+ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) (Ball bpos bvel)
   | tooFar = Nothing
   | hitX = Just $ signum (ballY - y) *^ unit _y
   | hitY = Just $ signum (ballX - x) *^ unit _x
@@ -136,11 +136,12 @@ ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) bpos
   where
     dist = bpos - pos
     V2 distAbsX distAbsY = abs <$> dist
+    V2 velAbsX velAbsY = abs <$> bvel
     V2 ballX ballY = bpos
     tooFar = distAbsX > width  / 2 + ballRadius
           || distAbsY > height / 2 + ballRadius
-    hitX = distAbsX <= width  / 2 || (hitCorner && distAbsY > distAbsX)
-    hitY = distAbsY <= height / 2 || (hitCorner && distAbsX > distAbsY)
+    hitX = distAbsX <= width  / 2 || (hitCorner && velAbsX <= velAbsY)
+    hitY = distAbsY <= height / 2 || (hitCorner && velAbsY <= velAbsX)
     hitCorner = quadrance (V2 (distAbsX - width / 2) (distAbsY - height / 2))
              <= ballRadius ^ (2 :: Int)
 
