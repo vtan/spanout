@@ -34,12 +34,13 @@ module Spanout.Common
   , brickWidth
   , brickHeight
   , countdownTime
+  , levelEndTime
   , bgColor
   , ballColor
   , batColor
   , brickColor
-  , countdownTextScale
-  , countdownTextColor
+  , textScale
+  , textColor
   ) where
 
 import Spanout.Wire
@@ -132,6 +133,9 @@ brickHeight = 0.1
 countdownTime :: Float
 countdownTime = 3
 
+levelEndTime :: Float
+levelEndTime = 1.5
+
 bgColor :: Gloss.Color
 bgColor = Gloss.greyN 0.15
 
@@ -144,8 +148,8 @@ batColor = Gloss.makeColor8 0x5e 0x85 0x9a 0xff
 brickColor :: Gloss.Color
 brickColor = Gloss.makeColor8 0xaa 0x52 0x39 0xff
 
-countdownTextScale :: Float
-countdownTextScale = 0.005
+textScale :: Float
+textScale = 0.005
 
-countdownTextColor :: Gloss.Color
-countdownTextColor = Gloss.chartreuse
+textColor :: Gloss.Color
+textColor = Gloss.chartreuse

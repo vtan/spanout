@@ -17,6 +17,7 @@ import Control.Monad
 import Data.Either (partitionEithers)
 import Data.Maybe
 import Data.Monoid
+import qualified Data.Set as Set
 
 import qualified Graphics.Gloss.Interface.IO.Game as Gloss
 
@@ -25,11 +26,11 @@ import Linear
 
 
 game :: a ->> Gloss.Picture
-game = Wire.bindW gsInit gameCountdown
+game = Wire.bindW gsInit gameBegin
   where
     gsInit = do
       bricks <- generateBricks
-      return $ GameState
+      return GameState
         { _gsBall = ballInit
         , _gsBatX = 0
         , _gsBricks = bricks
@@ -37,9 +38,9 @@ game = Wire.bindW gsInit gameCountdown
 
 
 
-gameCountdown :: GameState -> a ->> Gloss.Picture
-gameCountdown gsInit = Wire.switch $ proc _ -> do
-  batX <- Wire.constM . view $ envMouse . _x -< ()
+gameBegin :: GameState -> a ->> Gloss.Picture
+gameBegin gsInit = Wire.switch $ proc _ -> do
+  batX <- view _x ^<< mousePos -< ()
   time <- Wire.time -< ()
   let
     gs = set gsBatX batX gsInit
@@ -50,17 +51,17 @@ gameCountdown gsInit = Wire.switch $ proc _ -> do
 
 gameLevel :: GameState -> a ->> Gloss.Picture
 gameLevel gsInit = Wire.switch $ proc _ -> do
-  batX <- Wire.constM . view $ envMouse . _x -< ()
+  batX <- view _x ^<< mousePos -< ()
   rec
     ball' <- Wire.delay $ view gsBall gsInit -< ball
     bricks' <- Wire.delay $ view gsBricks gsInit -< bricks
 
-    edgeNormal <- ballEdgeCollision -< ball'
-    batNormal <- ballBatCollision -< (ball', batX)
-    ballBrickColl <- ballBrickCollision -< (ball', bricks')
     let
+      edgeNormal = ballEdgeNormal $ view ballPos ball'
+      batNormal = ballBatNormal batX $ view ballPos ball'
+      ballBrickColl = ballBrickCollision ball' bricks'
       brickNormals = fst <$> ballBrickColl
-      normal = mergeNormalEvents $
+      normal = mfilter (oppositeDir $ view ballVel ball') . mergeNormalEvents $
            maybeToList edgeNormal
         ++ maybeToList batNormal
         ++ fromMaybe [] brickNormals
@@ -72,42 +73,26 @@ gameLevel gsInit = Wire.switch $ proc _ -> do
       ball = Ball pos vel
       bricks = fromMaybe bricks' (snd <$> ballBrickColl)
 
+  let gs = GameState {_gsBall = ball, _gsBatX = batX, _gsBricks = bricks}
+  spacePressed <- keyPressed $ Gloss.SpecialKey Gloss.KeySpace -< ()
   returnA -< if
+    | spacePressed ->
+        Left game
     | null bricks ->
-        Left $ game
+        Left $ levelEnd gs
     | view (ballPos . _y) ball <= -screenBoundY ->
-        Left $ gameCountdown gsInit
+        Left $ gameBegin gsInit
     | otherwise ->
-        Right . gamePic $ GameState
-          { _gsBall = ball
-          , _gsBatX = batX
-          , _gsBricks = bricks
-          }
+        Right $ gamePic gs
+
+levelEnd :: GameState -> a ->> Gloss.Picture
+levelEnd gs = Wire.switch $ Wire.forThen levelEndTime game <<< pure pic
+  where
+    pic = gamePic gs <> levelEndPic
 
 mergeNormalEvents :: (Floating a, Epsilon a) => [V2 a] -> Maybe (V2 a)
 mergeNormalEvents [] = Nothing
 mergeNormalEvents normals = Just . normalize $ sum normals
-
-ballEdgeCollision :: Ball ->> Maybe (V2 Float)
-ballEdgeCollision = arr $ \(Ball pos vel) ->
-  mfilter (oppositeDir vel) $ ballEdgeNormal pos
-
-ballBatCollision :: (Ball, Float) ->> Maybe (V2 Float)
-ballBatCollision = arr $ \(Ball pos vel, x) ->
-  mfilter (oppositeDir vel) $ ballBatNormal x pos
-
-ballBrickCollision :: (Ball, [Brick]) ->> Maybe ([V2 Float], [Brick])
-ballBrickCollision = arr $ \(Ball pos vel, bricks) -> do
-  let
-    check brick =
-      case ballBrickNormal brick pos of
-        Just normal
-          | oppositeDir vel normal -> Right normal
-        _                          -> Left brick
-    bricks' = map check bricks
-    (remBricks, collisionNormals) = partitionEithers bricks'
-  guard . not . null $ collisionNormals
-  return (collisionNormals, remBricks)
 
 ballEdgeNormal :: V2 Float -> Maybe (V2 Float)
 ballEdgeNormal (V2 px py)
@@ -118,12 +103,24 @@ ballEdgeNormal (V2 px py)
 
 ballBatNormal :: Float -> V2 Float -> Maybe (V2 Float)
 ballBatNormal batX (V2 px py)
-  | bxl && bxr && by = Just $ batNormal px batX
+  | bxl && bxr && by = Just $ batNormalAt px batX
   | otherwise        = Nothing
   where
     bxl = px >= batX - batWidth / 2
     bxr = px <= batX + batWidth / 2
     by  = py <= batPositionY + batHeight / 2 + ballRadius
+
+ballBrickCollision :: Ball -> [Brick] -> Maybe ([V2 Float], [Brick])
+ballBrickCollision (Ball pos _) bricks =
+  case collisionNormals of
+    [] -> Nothing
+    _  -> Just (collisionNormals, remBricks)
+  where
+    check brick =
+      case ballBrickNormal brick pos of
+        Just normal -> Right normal
+        _           -> Left brick
+    (remBricks, collisionNormals) = partitionEithers . map check $ bricks
 
 ballBrickNormal :: Brick -> V2 Float -> Maybe (V2 Float)
 ballBrickNormal (Brick pos (Circle radius)) bpos
@@ -142,13 +139,13 @@ ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) bpos
     V2 ballX ballY = bpos
     tooFar = distAbsX > width  / 2 + ballRadius
           || distAbsY > height / 2 + ballRadius
-    hitX = distAbsX <= width  / 2 || (hitCorner && distAbsX > distAbsY)
-    hitY = distAbsY <= height / 2 || (hitCorner && distAbsY > distAbsX)
+    hitX = distAbsX <= width  / 2 || (hitCorner && distAbsY > distAbsX)
+    hitY = distAbsY <= height / 2 || (hitCorner && distAbsX > distAbsY)
     hitCorner = quadrance (V2 (distAbsX - width / 2) (distAbsY - height / 2))
              <= ballRadius ^ (2 :: Int)
 
-batNormal :: Float -> Float -> V2 Float
-batNormal x batX = perp . angle $ batSpread * relX
+batNormalAt :: Float -> Float -> V2 Float
+batNormalAt x batX = perp . angle $ batSpread * relX
   where
     relX = (batX - x) / (batWidth / 2)
 
@@ -157,3 +154,9 @@ oppositeDir vel normal = vel `dot` normal < 0
 
 reflect :: Num a => V2 a -> V2 a -> V2 a
 reflect vel normal = vel - (2 * vel `dot` normal) *^ normal
+
+mousePos :: a ->> V2 Float
+mousePos = Wire.constM $ view envMouse
+
+keyPressed :: Gloss.Key -> a ->> Bool
+keyPressed key = Wire.constM $ views envKeys (Set.member key)

@@ -6,6 +6,7 @@ module Spanout.Wire
   , accum
   , accumE
   , switch
+  , forThen
 
   , Wire
   , Wire.Timed(..)
@@ -14,6 +15,7 @@ module Spanout.Wire
   , Wire.time
   ) where
 
+import Control.Arrow
 import Control.Monad
 import Control.Wire (Wire)
 import qualified Control.Wire as Wire
@@ -50,3 +52,11 @@ switch w = Wire.mkGen $ \s a -> do
   case eb of
     Left w'' -> Wire.stepWire w'' mempty (Right a)
     Right b -> return (Right b, switch w')
+
+forThen :: (Wire.HasTime t s, Monad m) => t -> k -> Wire s e m a (Either k a)
+forThen t e = proc a -> do
+  t' <- Wire.time -< ()
+  returnA -<
+    if t' < t
+    then Right a
+    else Left e

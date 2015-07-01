@@ -4,6 +4,7 @@
 module Spanout.Graphics
   ( gamePic
   , countdownPic
+  , levelEndPic
   ) where
 
 import Spanout.Common
@@ -18,21 +19,27 @@ import Linear
 
 gamePic :: GameState -> Gloss.Picture
 gamePic GameState{..} = Gloss.pictures $
-     [ bg ]
-  ++ map brickPic _gsBricks
-  ++ [ batPic _gsBatX
+     [ bg
      , ballPic _gsBall
+     , batPic _gsBatX
      ]
+  ++ map brickPic _gsBricks
   where
     bg = Gloss.color bgColor
        $ Gloss.rectangleSolid screenWidth screenHeight
 
 countdownPic :: RealFrac a => a -> Gloss.Picture
 countdownPic t =
-    Gloss.scale countdownTextScale countdownTextScale
-  . Gloss.color countdownTextColor
+    Gloss.scale textScale textScale
+  . Gloss.color textColor
   . Gloss.text
   $ show (ceiling t :: Int)
+
+levelEndPic :: Gloss.Picture
+levelEndPic =
+    Gloss.color textColor
+  . Gloss.scale textScale textScale
+  $ Gloss.text "Done"
 
 
 
