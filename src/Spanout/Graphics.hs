@@ -60,9 +60,12 @@ brickPic (Brick (V2 x y) (Rectangle w h)) =
 circleFilled :: Gloss.Color -> Float -> Gloss.Picture
 circleFilled color radius =
      Gloss.color color (Gloss.circleSolid radius)
-  <> Gloss.color (Gloss.dark color) (Gloss.circle radius)
+  <> Gloss.color (border color) (Gloss.circle radius)
 
 rectangleFilled :: Gloss.Color -> Float -> Float -> Gloss.Picture
 rectangleFilled color width height =
      Gloss.color color (Gloss.rectangleSolid width height)
-  <> Gloss.color (Gloss.dark color) (Gloss.rectangleWire width height)
+  <> Gloss.color (border color) (Gloss.rectangleWire width height)
+
+border :: Gloss.Color -> Gloss.Color
+border = Gloss.dim
