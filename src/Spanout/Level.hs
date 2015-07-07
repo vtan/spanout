@@ -14,16 +14,16 @@ import Linear
 
 generateBricks :: MonadRandom m => m [Brick]
 generateBricks = do
-  relLevelHeight <- getRandomR (0.3, 0.8)
+  relLevelHeight <- getRandomR (0.3, 0.6)
   relRowHeights <- splitRow relLevelHeight
   let rowHeights = map (scrHeight *) relRowHeights
   rows <- forM rowHeights $ \h -> do
-    relW <- getRandomR (0.2, 0.9)
+    relW <- getRandomR (0.2, 0.8)
     shape <- getRandom
     let
       w = scrWidth * relW
       gen
-        | shape < (0.5 :: Float) = fillCircles
+        | shape < (0.3 :: Float) = fillCircles
         | otherwise              = fillRectangles
     return $ gen w h
   let levelHeight = scrHeight * relLevelHeight

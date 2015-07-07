@@ -104,7 +104,7 @@ screenBoundY :: Float
 screenBoundY = screenHeight / 2
 
 ballRadius :: Float
-ballRadius = 0.04
+ballRadius = 0.05
 
 ballInit :: Ball
 ballInit = Ball
@@ -116,7 +116,7 @@ batWidth :: Float
 batWidth = 0.5
 
 batHeight :: Float
-batHeight = 0.05
+batHeight = 0.07
 
 batPositionY :: Float
 batPositionY = -screenBoundY + batHeight / 2
@@ -125,10 +125,10 @@ batSpread :: Float
 batSpread = pi / 12
 
 brickWidth :: Float
-brickWidth = 0.3
+brickWidth = 0.4
 
 brickHeight :: Float
-brickHeight = 0.1
+brickHeight = 0.12
 
 countdownTime :: Float
 countdownTime = 3
@@ -152,4 +152,4 @@ textScale :: Float
 textScale = 0.004
 
 textColor :: Gloss.Color
-textColor = batColor
+textColor = Gloss.chartreuse

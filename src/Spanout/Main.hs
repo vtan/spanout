@@ -38,7 +38,7 @@ main :: IO ()
 main = Gloss.playIO disp Gloss.black fps world
     obtainPicture registerEvent performIteration
   where
-    disp = Gloss.InWindow "breakout" winSize (0, 0)
+    disp = Gloss.InWindow "spanout" winSize (0, 0)
     fps = 60
     winSize = (960, 540)
     world = World
