@@ -68,4 +68,6 @@ rectangleFilled color width height =
   <> Gloss.color (border color) (Gloss.rectangleWire width height)
 
 border :: Gloss.Color -> Gloss.Color
-border = Gloss.dim
+border color = Gloss.rawColor r g b 0.5
+  where
+    (r, g, b, _) = Gloss.rgbaOfColor $ Gloss.mixColors 0.5 0.5 color bgColor

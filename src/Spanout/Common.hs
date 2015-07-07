@@ -137,19 +137,19 @@ levelEndTime :: Float
 levelEndTime = 1.5
 
 bgColor :: Gloss.Color
-bgColor = Gloss.makeColor8 0xf5 0xe9 0xc2 0xff
+bgColor = Gloss.makeColor8 0x31 0x2b 0x25 0xff
 
 ballColor :: Gloss.Color
-ballColor = Gloss.makeColor8 0x67 0x4c 0xb7 0xff
+ballColor = Gloss.makeColor8 0x9f 0x87 0x6b 0xff
 
 batColor :: Gloss.Color
-batColor = Gloss.makeColor8 0x9d 0x90 0x64 0xff
+batColor = Gloss.makeColor8 0x6d 0xa3 0x3a 0xff
 
 brickColor :: Gloss.Color
-brickColor = Gloss.makeColor8 0x63 0xb8 0xc3 0xff
+brickColor = Gloss.makeColor8 0xb1 0x5b 0x3e 0xff
 
 textScale :: Float
 textScale = 0.004
 
 textColor :: Gloss.Color
-textColor = Gloss.greyN 0.3
+textColor = batColor
