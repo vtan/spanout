@@ -56,10 +56,12 @@ gameLevel gsInit = Wire.switch $ proc _ -> do
     ball' <- Wire.delay $ view gsBall gsInit -< ball
     bricks' <- Wire.delay $ view gsBricks gsInit -< bricks
 
+    pos <- Wire.accum (\dt p v -> p + dt *^ v) $ view (gsBall . ballPos) gsInit
+        -< view ballVel ball'
     let
-      edgeNormal = ballEdgeNormal $ view ballPos ball'
-      batNormal = ballBatNormal batX $ view ballPos ball'
-      ballBrickColl = ballBrickCollision ball' bricks'
+      edgeNormal = ballEdgeNormal pos
+      batNormal = ballBatNormal batX pos
+      ballBrickColl = ballBrickCollision (ball' {_ballPos = pos}) bricks'
       brickNormals = fst <$> ballBrickColl
       normal = mfilter (oppositeDir $ view ballVel ball') . mergeNormalEvents $
            maybeToList edgeNormal
@@ -67,8 +69,6 @@ gameLevel gsInit = Wire.switch $ proc _ -> do
         ++ fromMaybe [] brickNormals
 
     vel <- Wire.accumE reflect $ view (gsBall . ballVel) gsInit -< normal
-    pos <- Wire.accum (\dt p v -> p + dt *^ v) $ view (gsBall . ballPos) gsInit
-         -< vel
     let
       ball = Ball pos vel
       bricks = fromMaybe bricks' (snd <$> ballBrickColl)
@@ -80,7 +80,7 @@ gameLevel gsInit = Wire.switch $ proc _ -> do
         Left game
     | null bricks ->
         Left $ levelEnd gs
-    | view (ballPos . _y) ball <= -screenBoundY ->
+    | view (ballPos . _y) ball <= -screenBoundY - ballRadius ->
         Left $ gameBegin gsInit
     | otherwise ->
         Right $ gamePic gs
@@ -96,10 +96,10 @@ mergeNormalEvents normals = Just . normalize $ sum normals
 
 ballEdgeNormal :: V2 Float -> Maybe (V2 Float)
 ballEdgeNormal (V2 px py)
-  | px <= -screenBoundX = Just $  unit _x
-  | px >=  screenBoundX = Just $ -unit _x
-  | py >=  screenBoundY = Just $ -unit _y
-  | otherwise              = Nothing
+  | px <= -screenBoundX + ballRadius = Just $  unit _x
+  | px >=  screenBoundX - ballRadius = Just $ -unit _x
+  | py >=  screenBoundY - ballRadius = Just $ -unit _y
+  | otherwise                        = Nothing
 
 ballBatNormal :: Float -> V2 Float -> Maybe (V2 Float)
 ballBatNormal batX (V2 px py)
