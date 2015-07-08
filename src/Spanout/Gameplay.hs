@@ -130,8 +130,9 @@ ballBrickNormal (Brick pos (Circle radius)) (Ball bpos _)
     hit = distance bpos pos <= radius + ballRadius
 ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) (Ball bpos bvel)
   | tooFar = Nothing
-  | hitX = Just $ signum (ballY - y) *^ unit _y
-  | hitY = Just $ signum (ballX - x) *^ unit _x
+  | hitX = Just normalX
+  | hitY = Just normalY
+  | hitCorner = listToMaybe . filter (oppositeDir bvel) $ [normalX, normalY]
   | otherwise = Nothing
   where
     dist = bpos - pos
@@ -140,10 +141,12 @@ ballBrickNormal (Brick pos@(V2 x y) (Rectangle width height)) (Ball bpos bvel)
     V2 ballX ballY = bpos
     tooFar = distAbsX > width  / 2 + ballRadius
           || distAbsY > height / 2 + ballRadius
-    hitX = distAbsX <= width  / 2 || (hitCorner && velAbsX <= velAbsY)
-    hitY = distAbsY <= height / 2 || (hitCorner && velAbsY <= velAbsX)
+    hitX = distAbsX <= width / 2
+    hitY = distAbsY <= height / 2
     hitCorner = quadrance (V2 (distAbsX - width / 2) (distAbsY - height / 2))
              <= ballRadius ^ (2 :: Int)
+    normalX = signum (ballY - y) *^ unit _y
+    normalY = signum (ballX - x) *^ unit _x
 
 batNormalAt :: Float -> Float -> V2 Float
 batNormalAt x batX = perp . angle $ batSpread * relX
