@@ -109,7 +109,7 @@ ballRadius = 0.05
 ballInit :: Ball
 ballInit = Ball
   { _ballPos = V2 0 (-screenBoundY + 4 * batHeight)
-  , _ballVel = V2 0 (-1.7)
+  , _ballVel = V2 0 (-1.75)
   }
 
 batWidth :: Float
