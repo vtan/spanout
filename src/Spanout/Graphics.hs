@@ -9,7 +9,7 @@ module Spanout.Graphics
 
 import Spanout.Common
 
-import Data.Monoid ((<>))
+import Data.Monoid
 
 import qualified Graphics.Gloss as Gloss
 
@@ -17,6 +17,7 @@ import Linear
 
 
 
+-- The view of a game state
 gamePic :: GameState -> Gloss.Picture
 gamePic GameState{..} = Gloss.pictures $
      [ bg
@@ -28,6 +29,7 @@ gamePic GameState{..} = Gloss.pictures $
     bg = Gloss.color bgColor
        $ Gloss.rectangleSolid screenWidth screenHeight
 
+-- The view of a countdown timer
 countdownPic :: RealFrac a => a -> Gloss.Picture
 countdownPic t =
     Gloss.scale textScale textScale
@@ -35,6 +37,7 @@ countdownPic t =
   . Gloss.text
   $ show (ceiling t :: Int)
 
+-- A static picture after a level
 levelEndPic :: Gloss.Picture
 levelEndPic =
     Gloss.color textColor
@@ -67,6 +70,7 @@ rectangleFilled color width height =
      Gloss.color color (Gloss.rectangleSolid width height)
   <> Gloss.color (border color) (Gloss.rectangleWire width height)
 
+-- The color of the border of an object
 border :: Gloss.Color -> Gloss.Color
 border color = Gloss.rawColor r g b 0.5
   where

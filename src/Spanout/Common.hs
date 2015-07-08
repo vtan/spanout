@@ -57,8 +57,10 @@ import Linear
 
 
 
+-- The monad stack under reactive values
 type M = ReaderT Env (Rand StdGen)
 
+-- A reactive value of type `b`, which depends on a value of type `a`
 type a ->> b = Wire (Timed Float ()) () M a b
 
 data GameState = GameState

@@ -20,7 +20,7 @@ executable spanout
   ghc-options:
     -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
   other-extensions:
-    Arrows, MultiWayIf, TemplateHaskell, TypeOperators
+    Arrows, MultiWayIf, RecordWildCards, TemplateHaskell, TypeOperators
   build-depends:
     base >=4.6 && <5,
     mtl >=2.2 && <2.3,

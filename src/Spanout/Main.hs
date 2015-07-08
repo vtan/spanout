@@ -19,16 +19,16 @@ import qualified Graphics.Gloss.Interface.IO.Game as Gloss
 
 import Linear
 
-import qualified System.Exit as System (exitSuccess)
+import qualified System.Exit as System
 
 
 
 type MainWire = () ->> Gloss.Picture
 
 data World = World
-  { _worldWire    :: MainWire
-  , _worldEnv     :: Env
-  , _worldLastPic :: Gloss.Picture
+  { _worldWire     :: MainWire
+  , _worldEnv      :: Env
+  , _worldLastPic  :: Gloss.Picture
   , _worldViewPort :: Gloss.ViewPort
   }
 
@@ -54,6 +54,7 @@ main = Gloss.playIO disp Gloss.black fps world
 
 
 
+-- Updated the world with a gloss event
 registerEvent :: Gloss.Event -> World -> IO World
 registerEvent (Gloss.EventResize wh) world =
   return $ set worldViewPort (viewPort wh) world
@@ -67,6 +68,7 @@ registerEvent (Gloss.EventKey key Gloss.Down _ _) world =
 registerEvent (Gloss.EventKey key Gloss.Up _ _) world =
   return $ over (worldEnv . envKeys) (Set.delete key) world
 
+-- Steps the wire stored in the world and stores the resulting picture and wire
 performIteration :: Float -> World -> IO World
 performIteration dTime world = do
   let
@@ -75,15 +77,17 @@ performIteration dTime world = do
     mb = stepWire (view worldWire world) timed input
   (epic, wire') <- evalRandIO . runReaderT mb $ view worldEnv world
   case epic of
-    Right pic -> return $ set worldWire wire' . set worldLastPic pic $ world
+    Right pic -> return . set worldWire wire' . set worldLastPic pic $ world
     Left ()   -> System.exitSuccess
 
+-- The rendered picture from the world
 obtainPicture :: World -> IO Gloss.Picture
 obtainPicture world = return $ Gloss.applyViewPortToPicture vp pic
   where
     vp = view worldViewPort world
     pic = view worldLastPic world
 
+-- The viewport based on the new dimensions of the window
 viewPort :: (Int, Int) -> Gloss.ViewPort
 viewPort (w, h) = Gloss.viewPortInit { Gloss.viewPortScale = scale }
   where
