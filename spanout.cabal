@@ -2,6 +2,7 @@ name: spanout
 version: 0.1
 category: Game
 synopsis: A breakout clone written in netwire and gloss
+homepage: https://github.com/vtan/spanout
 author: Viktor Tanyi
 maintainer: Viktor Tanyi <tanyi.viktor@gmail.com>
 license: BSD3
@@ -10,6 +11,10 @@ description:
   A breakout clone written in netwire and gloss.
 build-type: Simple
 cabal-version: >=1.10
+
+source-repository head
+  type: git
+  location: git://github.com/vtan/spanout.git
 
 executable spanout
   hs-source-dirs: src
