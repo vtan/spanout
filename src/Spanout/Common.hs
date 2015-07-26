@@ -64,28 +64,28 @@ type M = ReaderT Env (Rand StdGen)
 type a ->> b = Wire (Timed Float ()) () M a b
 
 data GameState = GameState
-  { _gsBall          :: Ball
-  , _gsBatX          :: Float
-  , _gsBricks        :: [Brick]
+  { _gsBall          :: !Ball
+  , _gsBatX          :: !Float
+  , _gsBricks        :: ![Brick]
   }
 
 data Ball = Ball
-  { _ballPos :: V2 Float
-  , _ballVel :: V2 Float
+  { _ballPos :: !(V2 Float)
+  , _ballVel :: !(V2 Float)
   }
 
 data Brick = Brick
-  { _brPos  :: V2 Float
-  , _brGeom :: BrickGeom
+  { _brPos  :: !(V2 Float)
+  , _brGeom :: !BrickGeom
   }
 
 data BrickGeom
-  = Circle Float
-  | Rectangle Float Float
+  = Circle !Float
+  | Rectangle !Float !Float
 
 data Env = Env
-  { _envMouse :: V2 Float
-  , _envKeys  :: Set Gloss.Key
+  { _envMouse :: !(V2 Float)
+  , _envKeys  :: !(Set Gloss.Key)
   }
 
 makeLenses ''GameState
