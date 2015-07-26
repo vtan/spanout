@@ -48,27 +48,42 @@ levelEndPic =
 
 ballPic :: Ball -> Gloss.Picture
 ballPic (Ball {_ballPos = V2 x y}) =
-  Gloss.translate x y $ circleFilled ballColor ballRadius
+  Gloss.translate x y $ ballProto
 
 batPic :: Float -> Gloss.Picture
 batPic x =
-  Gloss.translate x batPositionY $ rectangleFilled batColor batWidth batHeight
+  Gloss.translate x batPositionY $ batProto
 
 brickPic :: Brick -> Gloss.Picture
 brickPic (Brick (V2 x y) (Circle r)) =
-  Gloss.translate x y $ circleFilled brickColor r
+  Gloss.translate x y . Gloss.scale r r $ circleBrickProto
 brickPic (Brick (V2 x y) (Rectangle w h)) =
-  Gloss.translate x y $ rectangleFilled brickColor w h
+  Gloss.translate x y . Gloss.scale w h $ rectBrickProto
 
-circleFilled :: Gloss.Color -> Float -> Gloss.Picture
-circleFilled color radius =
-     Gloss.color color (Gloss.circleSolid radius)
-  <> Gloss.color (border color) (Gloss.circle radius)
+ballProto :: Gloss.Picture
+ballProto = Gloss.scale ballRadius ballRadius $ circleFilled ballColor
 
-rectangleFilled :: Gloss.Color -> Float -> Float -> Gloss.Picture
-rectangleFilled color width height =
-     Gloss.color color (Gloss.rectangleSolid width height)
-  <> Gloss.color (border color) (Gloss.rectangleWire width height)
+batProto :: Gloss.Picture
+batProto = Gloss.scale batWidth batHeight $ squareFilled batColor
+
+circleBrickProto :: Gloss.Picture
+circleBrickProto = circleFilled brickColor
+
+rectBrickProto :: Gloss.Picture
+rectBrickProto = squareFilled brickColor
+
+circleFilled :: Gloss.Color -> Gloss.Picture
+circleFilled color =
+     Gloss.color color (Gloss.circleSolid 1)
+  <> Gloss.color (border color) (Gloss.circle 1)
+
+squareFilled :: Gloss.Color -> Gloss.Picture
+squareFilled color =
+     Gloss.color color (Gloss.polygon squareGeom)
+  <> Gloss.color (border color) (Gloss.lineLoop squareGeom)
+
+squareGeom :: Gloss.Path
+squareGeom = Gloss.rectanglePath 1 1
 
 -- The color of the border of an object
 border :: Gloss.Color -> Gloss.Color

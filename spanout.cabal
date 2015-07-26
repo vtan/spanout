@@ -23,7 +23,7 @@ executable spanout
     Spanout.Common, Spanout.Gameplay, Spanout.Graphics, Spanout.Level,
     Spanout.Main, Spanout.Wire
   ghc-options:
-    -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
+    -Wall -O2 -threaded -fprof-auto -rtsopts -with-rtsopts=-N
   other-extensions:
     Arrows, MultiWayIf, RecordWildCards, TemplateHaskell, TypeOperators
   build-depends:
