@@ -9,13 +9,9 @@ module Spanout.Graphics
 
 import Spanout.Common
 
-import Data.Monoid
-
 import qualified Graphics.Gloss as Gloss
 
 import Linear
-
-
 
 -- The view of a game state
 gamePic :: GameState -> Gloss.Picture
@@ -43,8 +39,6 @@ levelEndPic =
     Gloss.color textColor
   . Gloss.scale textScale textScale
   $ Gloss.text "Done"
-
-
 
 ballPic :: Ball -> Gloss.Picture
 ballPic (Ball {_ballPos = V2 x y}) =
@@ -87,6 +81,6 @@ squareGeom = Gloss.rectanglePath 1 1
 
 -- The color of the border of an object
 border :: Gloss.Color -> Gloss.Color
-border color = Gloss.rawColor r g b 0.5
+border color = Gloss.makeColor r g b 0.5
   where
     (r, g, b, _) = Gloss.rgbaOfColor $ Gloss.mixColors 0.5 0.5 color bgColor

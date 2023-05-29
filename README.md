@@ -15,26 +15,7 @@ Hit all the bricks and don't let the ball fall off.
 
 ## Compiling
 
-You need GHC and Cabal in order to compile *spanout*.
-Cabal 1.18+ and an updated package list (`cabal update`) are recommended.
-
-Building with local package installs only:
-~~~
-git clone https://github.com/vtan/spanout.git
-cd spanout
-cabal sandbox init
-cabal install --only-dependencies
-cabal configure
-cabal build
+Tested with GHC 9.2.8 and Cabal 3.6.2.0, both of which you can install with ghcup:
+```
 cabal run
-~~~
-
-Building without a sandbox – pollutes global or user package database:
-~~~
-git clone https://github.com/vtan/spanout.git
-cd spanout
-cabal install --only-dependencies
-cabal configure
-cabal build
-cabal run
-~~~
+```

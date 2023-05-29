@@ -55,8 +55,6 @@ import qualified Graphics.Gloss.Interface.IO.Game as Gloss
 
 import Linear
 
-
-
 -- The monad stack under reactive values
 type M = ReaderT Env (Rand StdGen)
 
@@ -139,16 +137,16 @@ levelEndTime :: Float
 levelEndTime = 1.5
 
 bgColor :: Gloss.Color
-bgColor = Gloss.makeColor8 0x31 0x2b 0x25 0xff
+bgColor = Gloss.makeColorI 0x31 0x2b 0x25 0xff
 
 ballColor :: Gloss.Color
-ballColor = Gloss.makeColor8 0x9f 0x87 0x6b 0xff
+ballColor = Gloss.makeColorI 0x9f 0x87 0x6b 0xff
 
 batColor :: Gloss.Color
-batColor = Gloss.makeColor8 0x6d 0xa3 0x3a 0xff
+batColor = Gloss.makeColorI 0x6d 0xa3 0x3a 0xff
 
 brickColor :: Gloss.Color
-brickColor = Gloss.makeColor8 0xb1 0x5b 0x3e 0xff
+brickColor = Gloss.makeColorI 0xb1 0x5b 0x3e 0xff
 
 textScale :: Float
 textScale = 0.004

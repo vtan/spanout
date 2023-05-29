@@ -11,7 +11,6 @@ import Spanout.Graphics
 import Spanout.Level
 import qualified Spanout.Wire as Wire
 
-import Control.Applicative
 import Control.Arrow
 import Control.Category
 import Control.Lens
@@ -19,14 +18,11 @@ import Control.Monad
 
 import Data.Either
 import Data.Maybe
-import Data.Monoid
 import qualified Data.Set as Set
 
 import qualified Graphics.Gloss.Interface.IO.Game as Gloss
 
 import Linear
-
-
 
 -- The reactive view of the game
 game :: a ->> Gloss.Picture
@@ -39,8 +35,6 @@ game = Wire.bindW gsInit gameBegin
         , _gsBatX = 0
         , _gsBricks = bricks
         }
-
-
 
 -- Displays the level and a countdown before the actual gameplay
 gameBegin :: GameState -> a ->> Gloss.Picture

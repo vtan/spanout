@@ -20,10 +20,6 @@ import Control.Monad
 import Control.Wire (Wire)
 import qualified Control.Wire as Wire
 
-import Data.Monoid
-
-
-
 -- A reactive value from a monadic value
 constM :: Monad m => m b -> Wire s e m a b
 constM m = Wire.mkGen_ . const $ liftM Right m
@@ -53,10 +49,11 @@ accumE f b = Wire.mkSFN $ \ma ->
 switch :: (Monoid s, Monad m)
   => Wire s e m a (Either (Wire s e m a b) b) -> Wire s e m a b
 switch w = Wire.mkGen $ \s a -> do
-  (Right eb, w') <- Wire.stepWire w s (Right a)
+  (eb, w') <- Wire.stepWire w s (Right a)
   case eb of
-    Left w'' -> Wire.stepWire w'' mempty (Right a)
-    Right b -> return (Right b, switch w')
+    Right (Left w'') -> Wire.stepWire w'' mempty (Right a)
+    Right (Right b)  -> return (Right b, switch w')
+    Left e           -> return (Left e, switch w')
 
 -- Acts as the identity wire for given time, then yield a constant value
 forThen :: (Wire.HasTime t s, Monad m) => t -> k -> Wire s e m a (Either k a)
