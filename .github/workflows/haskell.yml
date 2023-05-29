@@ -16,7 +16,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: haskell/actions/setup@v2
+    
+    - name: Setup OpenGL
+      run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends --fix-missing libgl1-mesa-dev
+    
+    - name: Setup Haskell
+      uses: haskell/actions/setup@v2
       with:
         ghc-version: '9.2.8'
         cabal-version: '3.6.2.0'
